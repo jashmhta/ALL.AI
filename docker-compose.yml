@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  multi-ai-app:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./.env:/app/.env
+    restart: always
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0

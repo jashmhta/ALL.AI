@@ -1,4 +1,4 @@
-# Deployment Guide
+# Deployment Guide for Multi-AI Application
 
 This document provides instructions for deploying the Multi-AI application both locally and in production environments.
 
@@ -38,81 +38,78 @@ This document provides instructions for deploying the Multi-AI application both 
 
 ## Production Deployment
 
-### Option 1: Streamlit Cloud
+### Option 1: Streamlit Cloud (Recommended)
 
-[Streamlit Cloud](https://streamlit.io/cloud) provides an easy way to deploy Streamlit applications.
+[Streamlit Cloud](https://streamlit.io/cloud) is the easiest and most reliable way to deploy Streamlit applications.
 
-1. **Push your code to GitHub**
-   - Ensure your repository is public or you have access to Streamlit Cloud with private repositories
+1. **Prerequisites**
+   - A GitHub account
+   - A Streamlit Cloud account (sign up at https://streamlit.io/cloud)
+   - The Multi-AI application repository on GitHub
 
-2. **Set up Secrets**
-   - In Streamlit Cloud, add your API keys as secrets
-   - These will be available as environment variables to your application
+2. **Deployment Steps**
+   - Log in to Streamlit Cloud using your GitHub account
+   - Click "New app" button
+   - Select the GitHub repository "ALL.AI"
+   - Set the main file path to "frontend/app.py"
+   - Configure the following secrets in the Streamlit Cloud dashboard:
+     - OPENAI_API_KEY
+     - GEMINI_API_KEY
+     - HUGGINGFACE_API_KEY
+     - OPENROUTER_API_KEY
+     - CLAUDE_API_KEY
+     - LLAMA_API_KEY
+     - BOTPRESS_API_KEY
+   - Click "Deploy" to launch the application
 
-3. **Deploy the Application**
-   - Connect your GitHub repository to Streamlit Cloud
-   - Select the `frontend/app.py` file as the entry point
-   - Click "Deploy"
+3. **Custom Domain (Optional)**
+   - Go to the app settings in Streamlit Cloud
+   - Click on "Custom domain"
+   - Follow the instructions to configure your domain's DNS settings
+   - Verify ownership and apply the custom domain
 
 ### Option 2: Docker Deployment
 
-1. **Create a Dockerfile**
-   ```dockerfile
-   FROM python:3.9-slim
-
-   WORKDIR /app
-
-   COPY requirements.txt .
-   RUN pip install -r requirements.txt
-
-   COPY . .
-
-   EXPOSE 8501
-
-   CMD ["streamlit", "run", "frontend/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
-   ```
-
-2. **Build the Docker Image**
+1. **Build the Docker Image**
    ```bash
    docker build -t multi-ai-app .
    ```
 
-3. **Run the Docker Container**
+2. **Run the Docker Container**
    ```bash
    docker run -p 8501:8501 --env-file .env multi-ai-app
    ```
 
-4. **Access the Application**
-   - Open your web browser and navigate to `http://localhost:8501`
-
-### Option 3: Heroku Deployment
-
-1. **Create a Procfile**
-   ```
-   web: streamlit run frontend/app.py --server.port=$PORT --server.address=0.0.0.0
-   ```
-
-2. **Add a runtime.txt file**
-   ```
-   python-3.9.13
-   ```
-
-3. **Deploy to Heroku**
+3. **Using Docker Compose**
    ```bash
-   heroku create multi-ai-app
-   git push heroku main
+   docker-compose up -d
    ```
 
-4. **Configure Environment Variables**
-   - Set your API keys as environment variables in the Heroku dashboard or using the Heroku CLI:
+### Option 3: Render
+
+[Render](https://render.com/) is a cloud platform that supports Python applications.
+
+1. **Connect your GitHub repository to Render**
+2. **Create a new Web Service**
+3. **Configure the service:**
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `streamlit run frontend/app.py --server.port=$PORT --server.address=0.0.0.0`
+4. **Add environment variables for your API keys**
+5. **Deploy the service**
+
+### Option 4: Fly.io
+
+[Fly.io](https://fly.io/) is another platform that can host Streamlit applications.
+
+1. **Install the Fly CLI**
+2. **Initialize your app:**
    ```bash
-   heroku config:set OPENAI_API_KEY=your_openai_api_key
-   heroku config:set GEMINI_API_KEY=your_gemini_api_key
-   # Add other API keys as needed
+   fly launch
    ```
-
-5. **Access the Application**
-   - Open your web browser and navigate to the URL provided by Heroku
+3. **Deploy your app:**
+   ```bash
+   fly deploy
+   ```
 
 ## Security Considerations for Deployment
 
@@ -128,10 +125,6 @@ This document provides instructions for deploying the Multi-AI application both 
 3. **Access Control**
    - Consider adding authentication if your deployment is public
    - Limit access to authorized users
-
-4. **Rate Limiting**
-   - Implement rate limiting to prevent abuse
-   - Monitor usage to stay within API provider limits
 
 ## Monitoring and Maintenance
 

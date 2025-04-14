@@ -1,0 +1,29 @@
+name: multi-ai-app
+region: sfo
+services:
+  - http_port: 8501
+    image: ${APP_IMAGE}
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        value: ${OPENAI_API_KEY}
+      - key: GEMINI_API_KEY
+        scope: RUN_TIME
+        value: ${GEMINI_API_KEY}
+      - key: HUGGINGFACE_API_KEY
+        scope: RUN_TIME
+        value: ${HUGGINGFACE_API_KEY}
+      - key: OPENROUTER_API_KEY
+        scope: RUN_TIME
+        value: ${OPENROUTER_API_KEY}
+      - key: CLAUDE_API_KEY
+        scope: RUN_TIME
+        value: ${CLAUDE_API_KEY}
+      - key: LLAMA_API_KEY
+        scope: RUN_TIME
+        value: ${LLAMA_API_KEY}
+      - key: BOTPRESS_API_KEY
+        scope: RUN_TIME
+        value: ${BOTPRESS_API_KEY}
