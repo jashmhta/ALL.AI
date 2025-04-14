@@ -9,12 +9,13 @@ class LlamaClient:
         if not self.api_key:
             raise ValueError("Llama API key is required")
         
-        self.api_url = "https://api.llama-api.com/chat/completions"  # Example URL, adjust as needed
+        # Updated to use a more likely endpoint for Llama API
+        self.api_url = "https://api.together.xyz/v1/chat/completions"
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-        self.model = "llama-3-70b-instruct"  # Example model, adjust as needed
+        self.model = "meta-llama/Llama-3-70b-chat"  # Updated model name
     
     async def generate_response(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """Generate a response from Llama API."""

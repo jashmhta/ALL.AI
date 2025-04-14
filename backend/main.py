@@ -1,6 +1,6 @@
 import os
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, List
 from dotenv import load_dotenv
 
 # Import client modules
@@ -10,6 +10,7 @@ from backend.clients.huggingface_client import HuggingFaceClient
 from backend.clients.openrouter_client import OpenRouterClient
 from backend.clients.claude_client import ClaudeClient
 from backend.clients.llama_client import LlamaClient
+from backend.clients.synthesis_client import SynthesisClient
 from backend.router import MultiAIRouter
 
 class MultiAIApp:
@@ -55,27 +56,46 @@ class MultiAIApp:
         if os.getenv("LLAMA_API_KEY"):
             try:
                 self.clients["llama"] = LlamaClient()
+                # Initialize synthesis client with Llama
+                self.synthesis_client = SynthesisClient(self.clients["llama"])
             except Exception as e:
                 print(f"Failed to initialize Llama client: {e}")
+                self.synthesis_client = SynthesisClient(None)
+        else:
+            self.synthesis_client = SynthesisClient(None)
         
         # Initialize router
         self.router = MultiAIRouter(self.clients)
     
     async def process_prompt(self, prompt: str, model: str = None, 
-                            use_multiple: bool = False, **kwargs) -> Dict[str, Any]:
+                            use_multiple: bool = False, synthesize: bool = False, **kwargs) -> Dict[str, Any]:
         """Process a user prompt and return AI response(s)."""
         if use_multiple:
             responses = await self.router.get_multiple_responses(prompt, **kwargs)
-            return {
-                "responses": responses,
-                "success": any(r["success"] for r in responses)
-            }
+            
+            # If synthesis is requested, use Llama to synthesize the responses
+            if synthesize and responses and any(r["success"] for r in responses):
+                synthesis = await self.synthesis_client.synthesize_responses(prompt, responses, **kwargs)
+                return {
+                    "responses": responses,
+                    "synthesis": synthesis,
+                    "success": True
+                }
+            else:
+                return {
+                    "responses": responses,
+                    "success": any(r["success"] for r in responses)
+                }
         else:
             return await self.router.get_response(prompt, model, **kwargs)
     
     def get_available_models(self) -> list:
         """Get list of available AI models."""
         return self.router.available_models
+    
+    def is_synthesis_available(self) -> bool:
+        """Check if synthesis functionality is available."""
+        return "llama" in self.clients
 
 # Example usage
 async def main():

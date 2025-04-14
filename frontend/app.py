@@ -104,6 +104,16 @@ with st.sidebar:
         
         use_multiple = st.checkbox("Get responses from all available models", value=False)
         
+        # Add synthesis option if Llama is available
+        synthesis_available = st.session_state.app.is_synthesis_available()
+        if synthesis_available:
+            use_synthesis = st.checkbox("Synthesize best response using Llama AI", value=True, 
+                                       help="Use Llama AI to create a single best response from all model outputs")
+        else:
+            use_synthesis = False
+            if use_multiple:
+                st.warning("Synthesis with Llama AI is not available. Check Llama API configuration.")
+        
         # Advanced options
         with st.expander("Advanced Options"):
             temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=0.7, step=0.1)
@@ -122,6 +132,7 @@ with st.sidebar:
         st.error("No AI models available. Please check your API keys in the .env file.")
         selected_model = None
         use_multiple = False
+        use_synthesis = False
 
 # Display chat messages
 for message in st.session_state.messages:
@@ -163,24 +174,48 @@ if available_models:
                         st.session_state.app.process_prompt(
                             prompt, 
                             use_multiple=True,
+                            synthesize=use_synthesis,
                             **params
                         )
                     )
                     
-                    # Display all responses
-                    for i, response in enumerate(result["responses"]):
-                        if response["success"]:
-                            st.markdown(f"**{response['model']}**:")
-                            st.markdown(response["text"])
-                            if i < len(result["responses"]) - 1:
-                                st.divider()
-                            
-                            # Add each response to chat history
-                            st.session_state.messages.append({
-                                "role": "assistant", 
-                                "content": response["text"],
-                                "model": response["model"]
-                            })
+                    # If synthesis is enabled and available, show the synthesized response first
+                    if use_synthesis and "synthesis" in result and result["synthesis"]["success"]:
+                        st.markdown("### Synthesized Response (via Llama AI)")
+                        st.markdown(result["synthesis"]["text"])
+                        st.divider()
+                        
+                        # Add synthesized response to chat history
+                        st.session_state.messages.append({
+                            "role": "assistant", 
+                            "content": result["synthesis"]["text"],
+                            "model": result["synthesis"]["model"]
+                        })
+                        
+                        # Show individual responses in an expander
+                        with st.expander("View Individual AI Responses"):
+                            for i, response in enumerate(result["responses"]):
+                                if response["success"]:
+                                    st.markdown(f"**{response['model']}**:")
+                                    st.markdown(response["text"])
+                                    if i < len(result["responses"]) - 1:
+                                        st.divider()
+                    else:
+                        # Display all responses
+                        st.markdown("### Individual AI Responses")
+                        for i, response in enumerate(result["responses"]):
+                            if response["success"]:
+                                st.markdown(f"**{response['model']}**:")
+                                st.markdown(response["text"])
+                                if i < len(result["responses"]) - 1:
+                                    st.divider()
+                                
+                                # Add each response to chat history
+                                st.session_state.messages.append({
+                                    "role": "assistant", 
+                                    "content": response["text"],
+                                    "model": response["model"]
+                                })
                 else:
                     # Get response from selected model
                     loop = asyncio.new_event_loop()
