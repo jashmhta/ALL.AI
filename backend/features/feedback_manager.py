@@ -1,64 +1,29 @@
 import os
+import asyncio
+from typing import Dict, Any, Optional, List
 import json
-from typing import Dict, Any, List, Optional, Tuple
+import numpy as np
+from datetime import datetime
 
 class FeedbackManager:
     """
-    Manages user feedback on AI responses for continuous improvement.
-    Tracks ratings, comments, and preferences to optimize model selection.
+    Manages user feedback for AI responses.
+    Collects, stores, and analyzes feedback to improve model selection.
     """
     
     def __init__(self):
         """Initialize the feedback manager."""
-        # Set up storage directory
-        self.storage_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "feedback")
+        self.storage_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "feedback")
+        self.ratings = {}  # In-memory cache of ratings
+        self.comments = {}  # In-memory cache of comments
+        
+        # Create storage directory if it doesn't exist
         os.makedirs(self.storage_dir, exist_ok=True)
         
-        # Initialize feedback storage
-        self.feedback_file = os.path.join(self.storage_dir, "feedback_data.json")
-        self.feedback_data = self._load_feedback_data()
-        
-        # Initialize model performance tracking
-        if "model_ratings" not in self.feedback_data:
-            self.feedback_data["model_ratings"] = {}
-        
-        if "user_preferences" not in self.feedback_data:
-            self.feedback_data["user_preferences"] = {}
-        
-        if "feedback_comments" not in self.feedback_data:
-            self.feedback_data["feedback_comments"] = []
+        # Load existing feedback data
+        self._load_feedback_data()
     
-    def _load_feedback_data(self) -> Dict[str, Any]:
-        """Load feedback data from disk."""
-        if os.path.exists(self.feedback_file):
-            try:
-                with open(self.feedback_file, 'r') as f:
-                    return json.load(f)
-            except Exception:
-                # Return default structure if file is corrupted
-                return {
-                    "model_ratings": {},
-                    "user_preferences": {},
-                    "feedback_comments": []
-                }
-        else:
-            # Return default structure if file doesn't exist
-            return {
-                "model_ratings": {},
-                "user_preferences": {},
-                "feedback_comments": []
-            }
-    
-    def _save_feedback_data(self) -> None:
-        """Save feedback data to disk."""
-        try:
-            with open(self.feedback_file, 'w') as f:
-                json.dump(self.feedback_data, f, indent=2)
-        except Exception as e:
-            print(f"Error saving feedback data: {e}")
-    
-    def add_response_rating(self, response_id: str, model: str, rating: int, 
-                          user_id: Optional[str] = None) -> None:
+    def add_response_rating(self, response_id: str, model: str, rating: int, user_id: Optional[str] = None) -> None:
         """
         Add a rating for an AI response.
         
@@ -69,225 +34,247 @@ class FeedbackManager:
             user_id: Optional identifier for the user
         """
         # Validate rating
-        rating = max(1, min(5, rating))
+        if not 1 <= rating <= 5:
+            raise ValueError("Rating must be between 1 and 5")
         
-        # Initialize model in ratings if not exists
-        if model not in self.feedback_data["model_ratings"]:
-            self.feedback_data["model_ratings"][model] = {
-                "total_ratings": 0,
-                "rating_sum": 0,
-                "rating_counts": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
-                "responses": {}
-            }
-        
-        # Add rating for specific response
-        self.feedback_data["model_ratings"][model]["responses"][response_id] = {
+        # Create rating entry
+        rating_entry = {
+            "response_id": response_id,
+            "model": model,
             "rating": rating,
-            "timestamp": os.times().elapsed,
-            "user_id": user_id
+            "user_id": user_id,
+            "timestamp": datetime.now().isoformat()
         }
         
-        # Update aggregated stats
-        self.feedback_data["model_ratings"][model]["total_ratings"] += 1
-        self.feedback_data["model_ratings"][model]["rating_sum"] += rating
-        self.feedback_data["model_ratings"][model]["rating_counts"][rating] += 1
+        # Add to in-memory cache
+        if model not in self.ratings:
+            self.ratings[model] = []
         
-        # Update user preferences if user_id provided
-        if user_id:
-            if user_id not in self.feedback_data["user_preferences"]:
-                self.feedback_data["user_preferences"][user_id] = {
-                    "model_ratings": {},
-                    "favorite_models": []
-                }
-            
-            if model not in self.feedback_data["user_preferences"][user_id]["model_ratings"]:
-                self.feedback_data["user_preferences"][user_id]["model_ratings"][model] = {
-                    "total_ratings": 0,
-                    "rating_sum": 0
-                }
-            
-            self.feedback_data["user_preferences"][user_id]["model_ratings"][model]["total_ratings"] += 1
-            self.feedback_data["user_preferences"][user_id]["model_ratings"][model]["rating_sum"] += rating
-            
-            # Update favorite models for user
-            self._update_user_favorites(user_id)
+        self.ratings[model].append(rating_entry)
         
-        # Save updated data
-        self._save_feedback_data()
+        # Save to disk
+        self._save_rating(rating_entry)
     
-    def add_feedback_comment(self, response_id: str, model: str, comment: str,
-                           user_id: Optional[str] = None) -> None:
+    def add_feedback_comment(self, response_id: str, model: str, comment: str, user_id: Optional[str] = None) -> None:
         """
-        Add a feedback comment for an AI response.
+        Add a comment for an AI response.
         
         Args:
             response_id: Unique identifier for the response
             model: The AI model that generated the response
-            comment: Feedback comment text
+            comment: Feedback comment
             user_id: Optional identifier for the user
         """
-        # Add comment to feedback data
-        feedback_entry = {
+        # Create comment entry
+        comment_entry = {
             "response_id": response_id,
             "model": model,
             "comment": comment,
-            "timestamp": os.times().elapsed,
-            "user_id": user_id
+            "user_id": user_id,
+            "timestamp": datetime.now().isoformat()
         }
         
-        self.feedback_data["feedback_comments"].append(feedback_entry)
+        # Add to in-memory cache
+        if model not in self.comments:
+            self.comments[model] = []
         
-        # Save updated data
-        self._save_feedback_data()
+        self.comments[model].append(comment_entry)
+        
+        # Save to disk
+        self._save_comment(comment_entry)
     
-    def _update_user_favorites(self, user_id: str) -> None:
-        """Update favorite models for a user based on ratings."""
-        if user_id not in self.feedback_data["user_preferences"]:
-            return
-        
-        user_prefs = self.feedback_data["user_preferences"][user_id]
-        model_ratings = user_prefs["model_ratings"]
-        
-        # Calculate average rating for each model
-        avg_ratings = {}
-        for model, data in model_ratings.items():
-            if data["total_ratings"] > 0:
-                avg_ratings[model] = data["rating_sum"] / data["total_ratings"]
-        
-        # Sort models by average rating
-        sorted_models = sorted(avg_ratings.items(), key=lambda x: x[1], reverse=True)
-        
-        # Update favorite models (top 3 with rating >= 4)
-        favorites = [model for model, rating in sorted_models if rating >= 4][:3]
-        user_prefs["favorite_models"] = favorites
-    
-    def get_model_performance(self, model: Optional[str] = None) -> Dict[str, Any]:
+    def get_model_ratings(self, model: str) -> List[Dict[str, Any]]:
         """
-        Get performance metrics for models based on user feedback.
+        Get all ratings for a specific model.
         
         Args:
-            model: Optional model name to filter metrics
+            model: The AI model
             
         Returns:
-            Dictionary with performance metrics
+            List of rating entries
         """
-        if model and model in self.feedback_data["model_ratings"]:
-            return self._get_single_model_performance(model)
-        
-        # Get metrics for all models
-        all_models = {}
-        for model_name in self.feedback_data["model_ratings"]:
-            all_models[model_name] = self._get_single_model_performance(model_name)
-        
-        return {
-            "models": all_models,
-            "overall_best": self._get_best_performing_model()
-        }
+        return self.ratings.get(model, [])
     
-    def _get_single_model_performance(self, model: str) -> Dict[str, Any]:
-        """Get performance metrics for a single model."""
-        model_data = self.feedback_data["model_ratings"].get(model, {
-            "total_ratings": 0,
-            "rating_sum": 0,
-            "rating_counts": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-        })
+    def get_model_comments(self, model: str) -> List[Dict[str, Any]]:
+        """
+        Get all comments for a specific model.
         
-        # Calculate average rating
-        avg_rating = 0
-        if model_data["total_ratings"] > 0:
-            avg_rating = model_data["rating_sum"] / model_data["total_ratings"]
+        Args:
+            model: The AI model
+            
+        Returns:
+            List of comment entries
+        """
+        return self.comments.get(model, [])
+    
+    def get_average_rating(self, model: str) -> Optional[float]:
+        """
+        Get the average rating for a specific model.
         
-        # Calculate rating distribution percentages
-        rating_distribution = {}
-        for rating, count in model_data["rating_counts"].items():
-            if model_data["total_ratings"] > 0:
-                percentage = (count / model_data["total_ratings"]) * 100
-            else:
-                percentage = 0
-            rating_distribution[rating] = {
-                "count": count,
-                "percentage": percentage
+        Args:
+            model: The AI model
+            
+        Returns:
+            Average rating or None if no ratings exist
+        """
+        ratings = self.ratings.get(model, [])
+        
+        if not ratings:
+            return None
+        
+        return sum(r["rating"] for r in ratings) / len(ratings)
+    
+    def get_rating_distribution(self, model: str) -> Dict[int, int]:
+        """
+        Get the distribution of ratings for a specific model.
+        
+        Args:
+            model: The AI model
+            
+        Returns:
+            Dictionary mapping rating values to counts
+        """
+        ratings = self.ratings.get(model, [])
+        
+        distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        
+        for rating in ratings:
+            distribution[rating["rating"]] += 1
+        
+        return distribution
+    
+    def get_model_comparison(self) -> Dict[str, Any]:
+        """
+        Get a comparison of all models based on ratings.
+        
+        Returns:
+            Dictionary with model comparison data
+        """
+        comparison = {}
+        
+        for model in self.ratings:
+            avg_rating = self.get_average_rating(model)
+            rating_count = len(self.ratings[model])
+            
+            comparison[model] = {
+                "average_rating": avg_rating,
+                "rating_count": rating_count,
+                "distribution": self.get_rating_distribution(model)
             }
         
-        return {
-            "average_rating": avg_rating,
-            "total_ratings": model_data["total_ratings"],
-            "rating_distribution": rating_distribution
-        }
-    
-    def _get_best_performing_model(self) -> Optional[str]:
-        """Get the best performing model based on average ratings."""
-        best_model = None
-        best_rating = 0
-        min_ratings_threshold = 5  # Minimum number of ratings to consider
-        
-        for model, data in self.feedback_data["model_ratings"].items():
-            if data["total_ratings"] >= min_ratings_threshold:
-                avg_rating = data["rating_sum"] / data["total_ratings"]
-                if avg_rating > best_rating:
-                    best_rating = avg_rating
-                    best_model = model
-        
-        return best_model
-    
-    def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
-        """
-        Get preferences for a specific user.
-        
-        Args:
-            user_id: Identifier for the user
-            
-        Returns:
-            Dictionary with user preferences
-        """
-        if user_id not in self.feedback_data["user_preferences"]:
-            return {
-                "favorite_models": [],
-                "model_ratings": {}
-            }
-        
-        return self.feedback_data["user_preferences"][user_id]
-    
-    def get_recommended_model(self, user_id: Optional[str] = None) -> str:
-        """
-        Get recommended model for a user based on their preferences.
-        
-        Args:
-            user_id: Optional identifier for the user
-            
-        Returns:
-            Recommended model name
-        """
-        # If user_id provided and user has preferences, use their favorite model
-        if user_id and user_id in self.feedback_data["user_preferences"]:
-            favorites = self.feedback_data["user_preferences"][user_id]["favorite_models"]
-            if favorites:
-                return favorites[0]
-        
-        # Otherwise, use the best performing model overall
-        best_model = self._get_best_performing_model()
-        if best_model:
-            return best_model
-        
-        # If no data available, return None
-        return None
+        return comparison
     
     def get_recent_feedback(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
-        Get recent feedback comments.
+        Get recent feedback (ratings and comments).
         
         Args:
-            limit: Maximum number of comments to return
+            limit: Maximum number of entries to return
             
         Returns:
-            List of recent feedback comments
+            List of recent feedback entries
         """
-        # Sort comments by timestamp (newest first)
-        sorted_comments = sorted(
-            self.feedback_data["feedback_comments"],
-            key=lambda x: x.get("timestamp", 0),
-            reverse=True
-        )
+        # Combine ratings and comments
+        all_feedback = []
         
-        # Return limited number of comments
-        return sorted_comments[:limit]
+        for model in self.ratings:
+            all_feedback.extend(self.ratings[model])
+        
+        for model in self.comments:
+            all_feedback.extend(self.comments[model])
+        
+        # Sort by timestamp (newest first)
+        all_feedback.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        
+        # Limit the number of entries
+        return all_feedback[:limit]
+    
+    def _save_rating(self, rating: Dict[str, Any]) -> None:
+        """
+        Save a rating to disk.
+        
+        Args:
+            rating: Rating entry
+        """
+        try:
+            # Create a filename with the response ID
+            filename = f"rating_{rating['response_id']}.json"
+            filepath = os.path.join(self.storage_dir, filename)
+            
+            # Write to file
+            with open(filepath, "w") as f:
+                json.dump(rating, f, indent=2)
+        except Exception as e:
+            print(f"Error saving rating: {e}")
+    
+    def _save_comment(self, comment: Dict[str, Any]) -> None:
+        """
+        Save a comment to disk.
+        
+        Args:
+            comment: Comment entry
+        """
+        try:
+            # Create a filename with the response ID
+            filename = f"comment_{comment['response_id']}.json"
+            filepath = os.path.join(self.storage_dir, filename)
+            
+            # Write to file
+            with open(filepath, "w") as f:
+                json.dump(comment, f, indent=2)
+        except Exception as e:
+            print(f"Error saving comment: {e}")
+    
+    def _load_feedback_data(self) -> None:
+        """Load existing feedback data from disk."""
+        try:
+            # List all files in the storage directory
+            for filename in os.listdir(self.storage_dir):
+                filepath = os.path.join(self.storage_dir, filename)
+                
+                try:
+                    # Read the file
+                    with open(filepath, "r") as f:
+                        data = json.load(f)
+                    
+                    # Add to the appropriate cache
+                    if filename.startswith("rating_"):
+                        model = data.get("model")
+                        
+                        if model:
+                            if model not in self.ratings:
+                                self.ratings[model] = []
+                            
+                            self.ratings[model].append(data)
+                    elif filename.startswith("comment_"):
+                        model = data.get("model")
+                        
+                        if model:
+                            if model not in self.comments:
+                                self.comments[model] = []
+                            
+                            self.comments[model].append(data)
+                except Exception as e:
+                    print(f"Error loading feedback file {filename}: {e}")
+        except Exception as e:
+            print(f"Error loading feedback data: {e}")
+    
+    def get_model_strengths(self) -> Dict[str, List[str]]:
+        """
+        Analyze comments to identify model strengths.
+        
+        Returns:
+            Dictionary mapping models to lists of strengths
+        """
+        # This is a simplified implementation
+        # In a real application, this would use NLP to analyze comments
+        
+        strengths = {}
+        
+        # Predefined strengths for each model
+        strengths["gpt"] = ["Detailed explanations", "Code examples", "Creative writing"]
+        strengths["claude"] = ["Thorough analysis", "Safety considerations", "Balanced responses"]
+        strengths["gemini"] = ["Concise responses", "Practical solutions", "Technical accuracy"]
+        strengths["llama"] = ["Fast responses", "Efficient code", "Straightforward answers"]
+        
+        return strengths

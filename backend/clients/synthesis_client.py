@@ -1,90 +1,164 @@
-import os
-import requests
-from typing import Dict, Any, Optional, List
+import asyncio
+from typing import Dict, Any, List, Optional
+import json
 
 class SynthesisClient:
-    def __init__(self, llama_client=None):
-        """Initialize the Synthesis client using Llama for combining outputs."""
-        self.llama_client = llama_client
+    """
+    Client for synthesizing responses from multiple AI models.
+    Uses Llama or another capable model to combine and analyze responses.
+    """
     
+    def __init__(self, llama_client=None):
+        """
+        Initialize the synthesis client.
+        
+        Args:
+            llama_client: Client for Llama API (or another capable model)
+        """
+        self.llama_client = llama_client
+        
     async def synthesize_responses(self, prompt: str, responses: List[Dict[str, Any]], **kwargs) -> Dict[str, Any]:
         """
-        Synthesize the best response from multiple AI outputs using Llama.
+        Synthesize responses from multiple AI models.
         
         Args:
             prompt: The original user prompt
-            responses: List of responses from different AI models
+            responses: List of responses from different models
+            **kwargs: Additional parameters for the synthesis
             
         Returns:
-            A synthesized response with the best elements from all models
+            Dict containing the synthesized response
         """
-        if not responses or len(responses) == 0:
+        if not self.llama_client:
             return {
-                "text": "No responses available to synthesize.",
+                "text": "Synthesis is not available. Please configure a Llama API key.",
                 "model": "synthesis",
-                "success": False
+                "success": False,
+                "error": "synthesis_unavailable"
             }
         
-        # If only one response, return it directly
-        if len(responses) == 1:
-            return responses[0]
-        
-        # Filter out unsuccessful responses
+        # Filter successful responses
         successful_responses = [r for r in responses if r.get("success", False)]
+        
         if not successful_responses:
             return {
-                "text": "No successful responses available to synthesize.",
+                "text": "No successful responses to synthesize.",
                 "model": "synthesis",
-                "success": False
+                "success": False,
+                "error": "no_successful_responses"
             }
         
-        # Create a prompt for Llama to synthesize the responses
-        synthesis_prompt = f"""
-You are an expert AI response synthesizer. Your task is to create the best possible response by combining insights from multiple AI models.
+        # Create a synthesis prompt
+        synthesis_prompt = self._create_synthesis_prompt(prompt, successful_responses)
+        
+        # Get temperature from kwargs or use default
+        temperature = kwargs.get("temperature", 0.7)
+        
+        try:
+            # Use Llama to synthesize the responses
+            synthesis_response = await self.llama_client.get_response(
+                synthesis_prompt,
+                temperature=temperature,
+                max_tokens=kwargs.get("max_tokens", 1500)
+            )
+            
+            if synthesis_response.get("success", False):
+                # Extract the synthesized text
+                synthesized_text = synthesis_response.get("text", "")
+                
+                # Clean up the synthesized text if needed
+                synthesized_text = self._clean_synthesis_output(synthesized_text)
+                
+                return {
+                    "text": synthesized_text,
+                    "model": "synthesis (via Llama)",
+                    "success": True,
+                    "usage": synthesis_response.get("usage", {})
+                }
+            else:
+                return {
+                    "text": "Failed to synthesize responses.",
+                    "model": "synthesis",
+                    "success": False,
+                    "error": "synthesis_failed"
+                }
+        except Exception as e:
+            return {
+                "text": f"Error during synthesis: {str(e)}",
+                "model": "synthesis",
+                "success": False,
+                "error": "synthesis_error"
+            }
+    
+    def _create_synthesis_prompt(self, original_prompt: str, responses: List[Dict[str, Any]]) -> str:
+        """
+        Create a prompt for the synthesis model.
+        
+        Args:
+            original_prompt: The original user prompt
+            responses: List of successful responses from different models
+            
+        Returns:
+            str: The synthesis prompt
+        """
+        # Start with a clear instruction
+        synthesis_prompt = """You are a synthesis AI that combines and analyzes responses from multiple AI models to provide the most comprehensive and accurate answer. Your task is to:
 
-Original user question: {prompt}
+1. Analyze the strengths and unique insights from each model's response
+2. Combine the best elements into a cohesive, well-structured answer
+3. Resolve any contradictions between different responses
+4. Ensure the final answer is accurate, helpful, and complete
+5. Maintain a neutral, balanced perspective
 
-Responses from different AI models:
+Here is the original user question:
+
 """
         
-        for i, response in enumerate(successful_responses):
-            model_name = response.get("model", f"Model {i+1}")
-            response_text = response.get("text", "No response")
-            synthesis_prompt += f"\n--- {model_name} ---\n{response_text}\n"
+        # Add the original prompt
+        synthesis_prompt += f'"{original_prompt}"\n\n'
+        synthesis_prompt += "Here are the responses from different AI models:\n\n"
         
-        synthesis_prompt += """
-Based on the above responses, create a single comprehensive response that:
-1. Combines the best insights from all models
-2. Resolves any contradictions between models
-3. Provides the most accurate and helpful information
-4. Is well-structured and easy to understand
-5. Directly addresses the user's original question
+        # Add each model's response
+        for i, response in enumerate(responses):
+            model_name = response.get("model", f"Model {i+1}")
+            response_text = response.get("text", "").strip()
+            
+            synthesis_prompt += f"=== {model_name} Response ===\n{response_text}\n\n"
+        
+        # Add final instruction
+        synthesis_prompt += """Based on these responses, provide a comprehensive synthesis that:
+- Combines the most accurate and helpful information from all models
+- Resolves any contradictions or inconsistencies
+- Provides a complete answer to the original question
+- Is well-structured and easy to understand
+- Cites specific models when they provided unique insights
 
-Your synthesized response:
-"""
+Your synthesized response:"""
         
-        # Use Llama to synthesize the responses
-        if self.llama_client:
-            try:
-                llama_response = await self.llama_client.generate_response(synthesis_prompt, **kwargs)
-                if llama_response.get("success", False):
-                    return {
-                        "text": llama_response["text"],
-                        "model": "synthesis (via Llama)",
-                        "success": True
-                    }
-            except Exception as e:
-                pass  # Fall back to manual synthesis if Llama fails
+        return synthesis_prompt
+    
+    def _clean_synthesis_output(self, text: str) -> str:
+        """
+        Clean up the synthesized output.
         
-        # Fallback: Simple concatenation if Llama is not available or fails
-        combined_text = "Synthesized response (combined from multiple models):\n\n"
-        for i, response in enumerate(successful_responses):
-            model_name = response.get("model", f"Model {i+1}")
-            response_text = response.get("text", "No response")
-            combined_text += f"--- From {model_name} ---\n{response_text}\n\n"
+        Args:
+            text: The raw synthesized text
+            
+        Returns:
+            str: The cleaned synthesized text
+        """
+        # Remove any "Synthesized Response:" prefix
+        if text.startswith("Synthesized Response:"):
+            text = text[len("Synthesized Response:"):].strip()
+            
+        # Remove any markdown-style model citations if they're too verbose
+        lines = text.split("\n")
+        cleaned_lines = []
         
-        return {
-            "text": combined_text,
-            "model": "synthesis (manual combination)",
-            "success": True
-        }
+        for line in lines:
+            # Skip lines that are just model attribution headers
+            if line.strip().startswith("(From ") and line.strip().endswith(")"):
+                continue
+            cleaned_lines.append(line)
+        
+        return "\n".join(cleaned_lines)

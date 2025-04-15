@@ -1,1 +1,36 @@
+# Ignore environment files
 .env
+.streamlit/secrets.toml
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore data directories
+data/cache/*
+data/conversations/*
+data/feedback/*
+data/files/*
+!data/cache/.gitkeep
+!data/conversations/.gitkeep
+!data/feedback/.gitkeep
+!data/files/.gitkeep
+
+# Ignore logs
+*.log
+
+# Ignore virtual environment
+venv/
+env/
+ENV/
+
+# Ignore IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

@@ -16,7 +16,7 @@ from backend.router import MultiAIRouter
 
 # Import performance enhancement modules
 from backend.cache import CacheManager
-from backend.utils import PerformanceMonitor, ResourceManager, with_timeout, retry_with_backoff
+from backend.utils import PerformanceMonitor, ResourceManager, with_timeout, retry_with_backoff, KeyManager
 
 # Import feature modules
 from backend.features import ConversationMemory, FileProcessor, FeedbackManager, ModelOptimizer
@@ -26,6 +26,9 @@ class MultiAIApp:
         """Initialize the Multi-AI Application."""
         # Load environment variables
         load_dotenv()
+        
+        # Initialize key manager for secure API key handling
+        self.key_manager = KeyManager()
         
         # Initialize performance enhancement components
         self.cache = CacheManager()
@@ -40,40 +43,52 @@ class MultiAIApp:
         # Initialize clients
         self.clients = {}
         
-        # Add available clients based on environment variables
-        if os.getenv("GEMINI_API_KEY"):
+        # Add available clients based on securely retrieved API keys
+        gemini_key = self.key_manager.get_api_key("gemini")
+        if gemini_key and self.key_manager.validate_key("gemini", gemini_key):
             try:
-                self.clients["gemini"] = GeminiClient()
+                self.clients["gemini"] = GeminiClient(api_key=gemini_key)
+                self.key_manager.log_key_usage("gemini", "initialization")
             except Exception as e:
                 print(f"Failed to initialize Gemini client: {e}")
         
-        if os.getenv("OPENAI_API_KEY"):
+        openai_key = self.key_manager.get_api_key("openai")
+        if openai_key and self.key_manager.validate_key("openai", openai_key):
             try:
-                self.clients["openai"] = OpenAIClient()
+                self.clients["openai"] = OpenAIClient(api_key=openai_key)
+                self.key_manager.log_key_usage("openai", "initialization")
             except Exception as e:
                 print(f"Failed to initialize OpenAI client: {e}")
         
-        if os.getenv("HUGGINGFACE_API_KEY"):
+        huggingface_key = self.key_manager.get_api_key("huggingface")
+        if huggingface_key and self.key_manager.validate_key("huggingface", huggingface_key):
             try:
-                self.clients["huggingface"] = HuggingFaceClient()
+                self.clients["huggingface"] = HuggingFaceClient(api_key=huggingface_key)
+                self.key_manager.log_key_usage("huggingface", "initialization")
             except Exception as e:
                 print(f"Failed to initialize Hugging Face client: {e}")
         
-        if os.getenv("OPENROUTER_API_KEY"):
+        openrouter_key = self.key_manager.get_api_key("openrouter")
+        if openrouter_key and self.key_manager.validate_key("openrouter", openrouter_key):
             try:
-                self.clients["openrouter"] = OpenRouterClient()
+                self.clients["openrouter"] = OpenRouterClient(api_key=openrouter_key)
+                self.key_manager.log_key_usage("openrouter", "initialization")
             except Exception as e:
                 print(f"Failed to initialize OpenRouter client: {e}")
         
-        if os.getenv("CLAUDE_API_KEY"):
+        claude_key = self.key_manager.get_api_key("claude")
+        if claude_key and self.key_manager.validate_key("claude", claude_key):
             try:
-                self.clients["claude"] = ClaudeClient()
+                self.clients["claude"] = ClaudeClient(api_key=claude_key)
+                self.key_manager.log_key_usage("claude", "initialization")
             except Exception as e:
                 print(f"Failed to initialize Claude client: {e}")
         
-        if os.getenv("LLAMA_API_KEY"):
+        llama_key = self.key_manager.get_api_key("llama")
+        if llama_key and self.key_manager.validate_key("llama", llama_key):
             try:
-                self.clients["llama"] = LlamaClient()
+                self.clients["llama"] = LlamaClient(api_key=llama_key)
+                self.key_manager.log_key_usage("llama", "initialization")
                 # Initialize synthesis client with Llama
                 self.synthesis_client = SynthesisClient(self.clients["llama"])
             except Exception as e:
@@ -247,6 +262,11 @@ class MultiAIApp:
             
             response = await self.router.get_response(prompt, model, fallback=False, **kwargs)
             
+            # Log API key usage
+            if model and response.get("success", False):
+                tokens_used = response.get("usage", {}).get("total_tokens", 0)
+                self.key_manager.log_key_usage(model, "completion", tokens_used)
+            
             # If primary model fails and fallback models are available, try them
             if not response["success"] and fallback_models:
                 for fallback_model in fallback_models:
@@ -257,7 +277,10 @@ class MultiAIApp:
                         model, fallback_model, fallback_response["success"]
                     )
                     
-                    if fallback_response["success"]:
+                    # Log API key usage for fallback
+                    if fallback_response.get("success", False):
+                        tokens_used = fallback_response.get("usage", {}).get("total_tokens", 0)
+                        self.key_manager.log_key_usage(fallback_model, "fallback_completion", tokens_used)
                         return fallback_response
             
             return response
@@ -312,7 +335,14 @@ class MultiAIApp:
         """Get synthesis of multiple responses with resource management and error handling."""
         # Define the function to execute
         async def get_synthesis():
-            return await self.synthesis_client.synthesize_responses(prompt, responses, **kwargs)
+            synthesis_response = await self.synthesis_client.synthesize_responses(prompt, responses, **kwargs)
+            
+            # Log API key usage for synthesis
+            if synthesis_response.get("success", False):
+                tokens_used = synthesis_response.get("usage", {}).get("total_tokens", 0)
+                self.key_manager.log_key_usage("llama", "synthesis", tokens_used)
+                
+            return synthesis_response
         
         # Submit the request to the resource manager
         return await self.resource_manager.submit_request(
@@ -322,6 +352,10 @@ class MultiAIApp:
             max_retries=1,
             initial_backoff=1.0
         )
+    
+    async def process_file(self, file_content: bytes, filename: str) -> Dict[str, Any]:
+        """Process an uploaded file and prepare it for AI analysis."""
+        return await self.file_processor.process_file(file_content, filename)
     
     def get_available_models(self) -> list:
         """Get list of available AI models."""
@@ -367,117 +401,14 @@ class MultiAIApp:
         if comment:
             self.feedback_manager.add_feedback_comment(response_id, model, comment, user_id)
         
-        # Update model optimizer with feedback
-        self.model_optimizer.update_model_performance(
-            "", model, rating >= 3, rating
-        )
-    
-    def save_conversation(self, conversation_id: str) -> str:
+    def save_conversation(self, conversation_id: str) -> Optional[str]:
         """
-        Save a conversation to disk.
+        Save the current conversation to a file.
         
         Args:
             conversation_id: Unique identifier for the conversation
             
         Returns:
-            Path to the saved conversation file
+            str: Path to the saved file, or None if saving failed
         """
         return self.conversation_memory.save_conversation(conversation_id)
-    
-    def load_conversation(self, conversation_id: str) -> bool:
-        """
-        Load a conversation from disk.
-        
-        Args:
-            conversation_id: Unique identifier for the conversation
-            
-        Returns:
-            True if the conversation was loaded successfully, False otherwise
-        """
-        return self.conversation_memory.load_conversation(conversation_id)
-    
-    def get_conversation_history(self, conversation_id: str) -> List[Dict[str, Any]]:
-        """
-        Get the full conversation history.
-        
-        Args:
-            conversation_id: Unique identifier for the conversation
-            
-        Returns:
-            List of messages in the conversation
-        """
-        return self.conversation_memory.get_conversation_history(conversation_id)
-    
-    async def process_file(self, file_content: bytes, filename: str) -> Dict[str, Any]:
-        """
-        Process an uploaded file.
-        
-        Args:
-            file_content: Binary content of the file
-            filename: Original filename
-            
-        Returns:
-            Dictionary with file processing results
-        """
-        # Save the file
-        success, file_path, error = await self.file_processor.save_uploaded_file(file_content, filename)
-        
-        if not success:
-            return {
-                "success": False,
-                "error": error
-            }
-        
-        # Get file info
-        file_info = self.file_processor.get_file_info(file_path)
-        
-        # Try to extract text if it's a text-based file
-        if file_info["category"] in ["text", "document"]:
-            text_success, text_content, text_error = await self.file_processor.extract_text_from_file(file_path)
-            
-            if text_success:
-                file_info["text_preview"] = text_content[:500] + "..." if len(text_content) > 500 else text_content
-                file_info["has_text"] = True
-            else:
-                file_info["has_text"] = False
-                file_info["text_error"] = text_error
-        else:
-            file_info["has_text"] = False
-        
-        return {
-            "success": True,
-            "file_info": file_info
-        }
-
-# Example usage
-async def main():
-    app = MultiAIApp()
-    available_models = app.get_available_models()
-    print(f"Available models: {available_models}")
-    
-    if available_models:
-        # Create a conversation
-        conversation_id = "test_conversation"
-        
-        # Process a prompt with conversation context
-        response = await app.process_prompt(
-            "Explain quantum computing in simple terms.",
-            conversation_id=conversation_id
-        )
-        print(f"Response from {response['model']}: {response['text']}")
-        
-        # Process a follow-up question
-        follow_up = await app.process_prompt(
-            "How is it different from classical computing?",
-            conversation_id=conversation_id
-        )
-        print(f"Follow-up response from {follow_up['model']}: {follow_up['text']}")
-        
-        # Get conversation history
-        history = app.get_conversation_history(conversation_id)
-        print(f"Conversation history: {history}")
-    else:
-        print("No AI models available. Please check your API keys.")
-
-if __name__ == "__main__":
-    asyncio.run(main())

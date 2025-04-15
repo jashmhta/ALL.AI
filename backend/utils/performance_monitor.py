@@ -1,258 +1,194 @@
-import logging
 import os
 import time
 from typing import Dict, Any, Optional, List
 
 class PerformanceMonitor:
     """
-    Monitors and logs performance metrics for the multi-AI application.
-    Tracks response times, success rates, and resource usage.
+    Monitors performance metrics for the Multi-AI application.
+    Tracks response times, success rates, and other performance indicators.
     """
     
-    def __init__(self, log_dir: str = None):
+    def __init__(self, metrics_retention_period: int = 3600):
         """
         Initialize the performance monitor.
         
         Args:
-            log_dir: Directory to store log files
+            metrics_retention_period: Time in seconds to retain metrics
         """
-        # Set up logging directory
-        self.log_dir = log_dir or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
-        os.makedirs(self.log_dir, exist_ok=True)
-        
-        # Configure logger
-        self.logger = self._setup_logger()
-        
-        # Initialize metrics storage
-        self.request_times = {}
-        self.success_rates = {}
-        self.request_counts = {}
-        self.error_counts = {}
-        
-        # Track current requests
-        self.active_requests = {}
-    
-    def _setup_logger(self) -> logging.Logger:
-        """Set up the performance logger."""
-        logger = logging.getLogger("performance_monitor")
-        logger.setLevel(logging.INFO)
-        
-        # Create file handler
-        log_file = os.path.join(self.log_dir, "performance.log")
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(logging.INFO)
-        
-        # Create formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        
-        # Add handler to logger
-        logger.addHandler(file_handler)
-        
-        return logger
+        self.metrics_retention_period = metrics_retention_period
+        self.requests = {}
+        self.model_metrics = {}
+        self.last_cleanup = time.time()
     
     def start_request(self, request_id: str, model: str) -> None:
         """
-        Start tracking a new request.
+        Start tracking a request.
         
         Args:
             request_id: Unique identifier for the request
-            model: The AI model being used
+            model: The model or service being used
         """
-        self.active_requests[request_id] = {
+        self.requests[request_id] = {
             "model": model,
             "start_time": time.time(),
-            "status": "in_progress"
+            "end_time": None,
+            "success": None,
+            "error_type": None
         }
     
-    def end_request(self, request_id: str, success: bool, error_type: str = None) -> float:
+    def end_request(self, request_id: str, success: bool, error_type: Optional[str] = None) -> None:
         """
-        End tracking for a request and record metrics.
+        End tracking a request.
         
         Args:
             request_id: Unique identifier for the request
             success: Whether the request was successful
             error_type: Type of error if the request failed
-            
-        Returns:
-            Duration of the request in seconds
         """
-        if request_id not in self.active_requests:
-            self.logger.warning(f"Attempted to end unknown request: {request_id}")
-            return 0.0
+        if request_id not in self.requests:
+            return
         
-        # Calculate duration
-        request_data = self.active_requests[request_id]
-        model = request_data["model"]
-        start_time = request_data["start_time"]
-        duration = time.time() - start_time
+        # Update request data
+        self.requests[request_id]["end_time"] = time.time()
+        self.requests[request_id]["success"] = success
+        self.requests[request_id]["error_type"] = error_type
         
-        # Update metrics
-        if model not in self.request_times:
-            self.request_times[model] = []
-            self.success_rates[model] = {"success": 0, "total": 0}
-            self.request_counts[model] = 0
-            self.error_counts[model] = {}
+        # Calculate response time
+        start_time = self.requests[request_id]["start_time"]
+        end_time = self.requests[request_id]["end_time"]
+        response_time = end_time - start_time
         
-        self.request_times[model].append(duration)
-        self.success_rates[model]["total"] += 1
-        self.request_counts[model] += 1
+        # Get model
+        model = self.requests[request_id]["model"]
+        
+        # Update model metrics
+        if model not in self.model_metrics:
+            self.model_metrics[model] = {
+                "requests": 0,
+                "successful_requests": 0,
+                "total_response_time": 0,
+                "error_counts": {}
+            }
+        
+        self.model_metrics[model]["requests"] += 1
         
         if success:
-            self.success_rates[model]["success"] += 1
-            status = "success"
-        else:
-            status = "error"
-            error_type = error_type or "unknown"
-            if error_type not in self.error_counts[model]:
-                self.error_counts[model][error_type] = 0
-            self.error_counts[model][error_type] += 1
+            self.model_metrics[model]["successful_requests"] += 1
+        elif error_type:
+            if error_type not in self.model_metrics[model]["error_counts"]:
+                self.model_metrics[model]["error_counts"][error_type] = 0
+            self.model_metrics[model]["error_counts"][error_type] += 1
         
-        # Log the request
-        self.logger.info(
-            f"Request {request_id} to {model} completed with status {status} in {duration:.2f}s"
-        )
+        self.model_metrics[model]["total_response_time"] += response_time
         
-        # Remove from active requests
-        self.active_requests.pop(request_id)
+        # Periodically clean up old requests
+        current_time = time.time()
+        if current_time - self.last_cleanup > 300:  # Clean up every 5 minutes
+            self.cleanup_stale_requests()
+            self.last_cleanup = current_time
+    
+    def cleanup_stale_requests(self) -> None:
+        """Clean up stale request data."""
+        current_time = time.time()
+        stale_requests = []
         
-        return duration
+        for request_id, request_data in self.requests.items():
+            # If the request has ended and is older than the retention period
+            if request_data["end_time"] and current_time - request_data["end_time"] > self.metrics_retention_period:
+                stale_requests.append(request_id)
+        
+        # Remove stale requests
+        for request_id in stale_requests:
+            del self.requests[request_id]
     
     def get_metrics(self, model: Optional[str] = None) -> Dict[str, Any]:
         """
         Get performance metrics.
         
         Args:
-            model: Optional model name to filter metrics
+            model: Optional model to get metrics for
             
         Returns:
-            Dictionary with performance metrics
+            Dict containing performance metrics
         """
-        if model and model in self.request_times:
-            return self._get_model_metrics(model)
-        
-        # Get metrics for all models
         metrics = {
-            "overall": {
-                "total_requests": sum(self.request_counts.values()),
-                "average_response_time": self._calculate_overall_average(),
-                "success_rate": self._calculate_overall_success_rate(),
-                "error_distribution": self._calculate_overall_error_distribution()
-            },
+            "overall": self._calculate_overall_metrics(),
             "models": {}
         }
         
-        for model_name in self.request_times:
-            metrics["models"][model_name] = self._get_model_metrics(model_name)
+        # Add metrics for each model
+        for model_name, model_data in self.model_metrics.items():
+            if model and model != model_name:
+                continue
+                
+            metrics["models"][model_name] = self._calculate_model_metrics(model_name)
         
         return metrics
     
-    def _get_model_metrics(self, model: str) -> Dict[str, Any]:
-        """Get metrics for a specific model."""
-        times = self.request_times[model]
-        success_data = self.success_rates[model]
+    def _calculate_overall_metrics(self) -> Dict[str, Any]:
+        """
+        Calculate overall performance metrics.
         
-        if not times:
-            return {
-                "requests": 0,
-                "average_response_time": 0,
-                "success_rate": 0,
-                "error_types": {}
-            }
+        Returns:
+            Dict containing overall metrics
+        """
+        total_requests = sum(model_data["requests"] for model_data in self.model_metrics.values())
+        successful_requests = sum(model_data["successful_requests"] for model_data in self.model_metrics.values())
+        total_response_time = sum(model_data["total_response_time"] for model_data in self.model_metrics.values())
         
-        avg_time = sum(times) / len(times)
-        success_rate = (success_data["success"] / success_data["total"]) * 100 if success_data["total"] > 0 else 0
+        if total_requests > 0:
+            success_rate = (successful_requests / total_requests) * 100
+            average_response_time = total_response_time / total_requests
+        else:
+            success_rate = 0
+            average_response_time = 0
         
         return {
-            "requests": self.request_counts[model],
-            "average_response_time": avg_time,
+            "total_requests": total_requests,
+            "successful_requests": successful_requests,
             "success_rate": success_rate,
-            "error_types": self.error_counts.get(model, {})
+            "average_response_time": average_response_time
         }
     
-    def _calculate_overall_average(self) -> float:
-        """Calculate the overall average response time across all models."""
-        all_times = []
-        for model in self.request_times:
-            all_times.extend(self.request_times[model])
+    def _calculate_model_metrics(self, model: str) -> Dict[str, Any]:
+        """
+        Calculate metrics for a specific model.
         
-        if not all_times:
-            return 0.0
+        Args:
+            model: The model to calculate metrics for
+            
+        Returns:
+            Dict containing model metrics
+        """
+        model_data = self.model_metrics.get(model, {
+            "requests": 0,
+            "successful_requests": 0,
+            "total_response_time": 0,
+            "error_counts": {}
+        })
         
-        return sum(all_times) / len(all_times)
-    
-    def _calculate_overall_success_rate(self) -> float:
-        """Calculate the overall success rate across all models."""
-        total_success = sum(data["success"] for data in self.success_rates.values())
-        total_requests = sum(data["total"] for data in self.success_rates.values())
+        if model_data["requests"] > 0:
+            success_rate = (model_data["successful_requests"] / model_data["requests"]) * 100
+            average_response_time = model_data["total_response_time"] / model_data["requests"]
+        else:
+            success_rate = 0
+            average_response_time = 0
         
-        if total_requests == 0:
-            return 0.0
-        
-        return (total_success / total_requests) * 100
-    
-    def _calculate_overall_error_distribution(self) -> Dict[str, int]:
-        """Calculate the overall error distribution across all models."""
-        error_distribution = {}
-        
-        for model in self.error_counts:
-            for error_type, count in self.error_counts[model].items():
-                if error_type not in error_distribution:
-                    error_distribution[error_type] = 0
-                error_distribution[error_type] += count
-        
-        return error_distribution
+        return {
+            "requests": model_data["requests"],
+            "successful_requests": model_data["successful_requests"],
+            "success_rate": success_rate,
+            "average_response_time": average_response_time,
+            "error_counts": model_data["error_counts"]
+        }
     
     def log_cache_metrics(self, cache_stats: Dict[str, Any]) -> None:
         """
-        Log cache performance metrics.
+        Log cache metrics.
         
         Args:
-            cache_stats: Statistics from the cache manager
+            cache_stats: Statistics from the cache
         """
-        self.logger.info(f"Cache stats: {cache_stats}")
-    
-    def cleanup_stale_requests(self, timeout: float = 300.0) -> List[str]:
-        """
-        Clean up tracking for stale requests that were never completed.
-        
-        Args:
-            timeout: Time in seconds after which a request is considered stale
-            
-        Returns:
-            List of request IDs that were cleaned up
-        """
-        current_time = time.time()
-        stale_requests = []
-        
-        for request_id, data in list(self.active_requests.items()):
-            if current_time - data["start_time"] > timeout:
-                model = data["model"]
-                duration = current_time - data["start_time"]
-                
-                # Log the stale request
-                self.logger.warning(
-                    f"Request {request_id} to {model} timed out after {duration:.2f}s"
-                )
-                
-                # Update metrics
-                if model not in self.request_times:
-                    self.request_times[model] = []
-                    self.success_rates[model] = {"success": 0, "total": 0}
-                    self.request_counts[model] = 0
-                    self.error_counts[model] = {}
-                
-                self.request_times[model].append(duration)
-                self.success_rates[model]["total"] += 1
-                self.request_counts[model] += 1
-                
-                # Count as timeout error
-                if "timeout" not in self.error_counts[model]:
-                    self.error_counts[model]["timeout"] = 0
-                self.error_counts[model]["timeout"] += 1
-                
-                # Remove from active requests
-                self.active_requests.pop(request_id)
-                stale_requests.append(request_id)
-        
-        return stale_requests
+        # This would typically store cache metrics for reporting
+        # For now, we'll just print them
+        print(f"Cache stats: {cache_stats}")
