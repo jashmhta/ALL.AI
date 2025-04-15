@@ -84,8 +84,7 @@ def initialize_backend():
     llama_client = LlamaClient(secret_manager.get_secret("LLAMA_API_KEY"))
     huggingface_client = HuggingFaceClient(secret_manager.get_secret("HUGGINGFACE_API_KEY"))
     openrouter_client = OpenRouterClient(
-        secret_manager.get_secret("OPENROUTER_API_KEY"),
-        secret_manager.get_secret("OPENROUTER_API_KEY_2")
+        secret_manager.get_secret("OPENROUTER_API_KEY")
     )
     deepseek_client = DeepSeekClient(secret_manager.get_secret("DEEPSEEK_API_KEY"))
     synthesis_client = SynthesisClient()
