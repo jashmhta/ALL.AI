@@ -1,5 +1,5 @@
 import os
-import openai
+from openai import OpenAI
 from typing import Dict, Any, Optional
 
 class OpenAIClient:
@@ -9,15 +9,17 @@ class OpenAIClient:
         if not self.api_key:
             raise ValueError("OpenAI API key is required")
         
-        openai.api_key = self.api_key
+        # Initialize OpenAI client without proxies parameter
+        self.client = OpenAI(api_key=self.api_key)
     
     async def generate_response(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """Generate a response from OpenAI API."""
         try:
-            response = openai.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
-                **kwargs
+                temperature=kwargs.get("temperature", 0.7),
+                max_tokens=kwargs.get("max_tokens", 1000)
             )
             return {
                 "text": response.choices[0].message.content,

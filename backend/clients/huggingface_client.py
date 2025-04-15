@@ -3,12 +3,13 @@ import requests
 from typing import Dict, Any, Optional
 
 class HuggingFaceClient:
-    def __init__(self, api_key: Optional[str] = None, model_id: str = "google/flan-t5-xxl"):
+    def __init__(self, api_key: Optional[str] = None, model_id: str = "mistralai/Mistral-7B-Instruct-v0.1"):
         """Initialize the Hugging Face client with API key."""
         self.api_key = api_key or os.getenv("HUGGINGFACE_API_KEY")
         if not self.api_key:
             raise ValueError("Hugging Face API key is required")
         
+        # Using a more accessible model that's likely to work with the free tier
         self.model_id = model_id
         self.api_url = f"https://api-inference.huggingface.co/models/{model_id}"
         self.headers = {"Authorization": f"Bearer {self.api_key}"}

@@ -9,7 +9,7 @@ class ClaudeClient:
         if not self.api_key:
             raise ValueError("Claude API key is required")
         
-        # Remove proxies parameter that's causing the error
+        # Initialize Anthropic client with just the API key
         self.client = Anthropic(api_key=self.api_key)
         self.model = "claude-3-opus-20240229"
     

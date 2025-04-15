@@ -9,20 +9,20 @@ class LlamaClient:
         if not self.api_key:
             raise ValueError("Llama API key is required")
         
-        # Updated to use a more likely endpoint for Llama API
-        self.api_url = "https://api.together.xyz/v1/chat/completions"
+        # Using the Together.ai API for Llama access
+        self.api_url = "https://api.together.xyz/v1/completions"
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-        self.model = "meta-llama/Llama-3-70b-chat"  # Updated model name
+        self.model = "togethercomputer/llama-2-7b-chat"  # Using a more accessible model
     
     async def generate_response(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """Generate a response from Llama API."""
         try:
             payload = {
                 "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
+                "prompt": prompt,
                 "temperature": kwargs.get("temperature", 0.7),
                 "max_tokens": kwargs.get("max_tokens", 1000)
             }
@@ -32,7 +32,7 @@ class LlamaClient:
             
             result = response.json()
             return {
-                "text": result["choices"][0]["message"]["content"],
+                "text": result["choices"][0]["text"],
                 "model": self.model,
                 "success": True
             }
