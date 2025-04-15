@@ -18,6 +18,7 @@ class SecretManager:
         """
         self.config_path = config_path
         self.secrets = self._load_secrets()
+        self.is_huggingface_space = "SPACE_ID" in os.environ
         
         # Default API keys (for development/testing only)
         self.default_keys = {
@@ -91,6 +92,32 @@ class SecretManager:
         # Return default key (empty string if not set)
         return self.default_keys.get(provider, "")
     
+    def get_secret(self, key: str) -> str:
+        """
+        Get secret by key name.
+        
+        Args:
+            key: Secret key name
+            
+        Returns:
+            Secret value
+        """
+        # Handle API keys with provider name in key
+        for provider in ["OPENAI", "CLAUDE", "GEMINI", "LLAMA", "HUGGINGFACE", "OPENROUTER", "DEEPSEEK"]:
+            if key == f"{provider}_API_KEY":
+                return self.get_api_key(provider.lower())
+        
+        # Try to get from Streamlit secrets
+        if hasattr(st, "secrets") and key in st.secrets:
+            return st.secrets[key]
+        
+        # Try to get from environment variables
+        if key in os.environ:
+            return os.environ[key]
+        
+        # Return empty string if not found
+        return ""
+    
     def set_api_key(self, provider: str, api_key: str) -> None:
         """
         Set API key for a provider.
@@ -103,6 +130,27 @@ class SecretManager:
         
         # Update default keys
         self.default_keys[provider] = api_key
+        
+        # Save to config file if provided
+        if self.config_path:
+            self._save_secrets()
+    
+    def set_secret(self, key: str, value: str) -> None:
+        """
+        Set secret by key name.
+        
+        Args:
+            key: Secret key name
+            value: Secret value
+        """
+        # Handle API keys with provider name in key
+        for provider in ["OPENAI", "CLAUDE", "GEMINI", "LLAMA", "HUGGINGFACE", "OPENROUTER", "DEEPSEEK"]:
+            if key == f"{provider}_API_KEY":
+                self.set_api_key(provider.lower(), value)
+                return
+        
+        # Store in secrets dictionary
+        self.secrets[key] = value
         
         # Save to config file if provided
         if self.config_path:
@@ -158,6 +206,23 @@ class SecretManager:
         """
         return [provider for provider in self.secrets if self.has_api_key(provider)]
     
+    def get_available_models(self) -> Dict[str, bool]:
+        """
+        Get dictionary of available models based on API keys.
+        
+        Returns:
+            Dictionary of provider to availability status
+        """
+        return {
+            "openai": self.has_api_key("openai"),
+            "claude": self.has_api_key("claude"),
+            "gemini": self.has_api_key("gemini"),
+            "llama": self.has_api_key("llama"),
+            "huggingface": self.has_api_key("huggingface"),
+            "openrouter": self.has_api_key("openrouter"),
+            "deepseek": self.has_api_key("deepseek")
+        }
+    
     def clear_api_key(self, provider: str) -> None:
         """
         Clear API key for a provider.
@@ -205,3 +270,36 @@ class SecretManager:
             self._save_secrets()
         
         return results
+    
+    def create_secrets_toml(self, directory_path: str) -> bool:
+        """
+        Create secrets.toml file in .streamlit directory.
+        
+        Args:
+            directory_path: Directory path for .streamlit folder
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Create .streamlit directory if it doesn't exist
+            streamlit_dir = os.path.join(directory_path, ".streamlit")
+            os.makedirs(streamlit_dir, exist_ok=True)
+            
+            # Create secrets.toml file
+            secrets_path = os.path.join(streamlit_dir, "secrets.toml")
+            
+            # Prepare secrets data
+            secrets_data = {}
+            for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek"]:
+                if self.has_api_key(provider):
+                    secrets_data[f"{provider}_api_key"] = self.get_api_key(provider)
+            
+            # Write to file
+            with open(secrets_path, 'w') as f:
+                toml.dump(secrets_data, f)
+            
+            return True
+        except Exception as e:
+            print(f"Error creating secrets.toml: {str(e)}")
+            return False
