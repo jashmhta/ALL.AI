@@ -595,20 +595,33 @@ def main():
         
         # Input area
         st.markdown('<div class="input-area">', unsafe_allow_html=True)
+        
+        # Use a callback to handle the message sending
+        def handle_send():
+            if st.session_state.user_input and not st.session_state.processing:
+                try:
+                    process_user_input(st.session_state.user_input)
+                    # We'll clear the input in the next rerun via callback
+                    st.session_state.clear_input = True
+                except Exception as e:
+                    st.error(f"Error processing message: {str(e)}")
+                    st.session_state.processing = False
+        
+        # Initialize clear_input flag if not exists
+        if 'clear_input' not in st.session_state:
+            st.session_state.clear_input = False
+            
+        # Clear input if needed (from previous send)
+        if st.session_state.clear_input:
+            st.session_state.user_input = ""
+            st.session_state.clear_input = False
+            
+        # Create the input widget
         user_input = st.text_area("Your message", height=100, key="user_input")
         
         col1, col2 = st.columns([1, 5])
         with col1:
-            send_button = st.button("Send", use_container_width=True)
-        
-        if send_button and user_input and not st.session_state.processing:
-            try:
-                process_user_input(user_input)
-                # Clear input after sending
-                st.session_state.user_input = ""
-            except Exception as e:
-                st.error(f"Error processing message: {str(e)}")
-                st.session_state.processing = False
+            send_button = st.button("Send", on_click=handle_send, use_container_width=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
     
