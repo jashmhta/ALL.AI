@@ -256,6 +256,9 @@ if 'uploaded_file_info' not in st.session_state:
 
 if 'user_id' not in st.session_state:
     st.session_state.user_id = str(uuid.uuid4())
+    
+if 'user_input' not in st.session_state:
+    st.session_state.user_input = ""
 
 # Function to add a message to the chat
 def add_message(role, content, model=None):
