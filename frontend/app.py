@@ -232,6 +232,71 @@ st.markdown("""
         padding: 2rem;
         color: #AAAAAA;
     }
+    
+    /* Welcome section with hand wave emoji */
+    .welcome-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+    }
+    
+    .welcome-header h2 {
+        margin: 0;
+        margin-left: 0.5rem;
+    }
+    
+    .wave-emoji {
+        font-size: 1.8rem;
+        animation: wave 2s infinite;
+        transform-origin: 70% 70%;
+        display: inline-block;
+    }
+    
+    @keyframes wave {
+        0% { transform: rotate(0deg); }
+        10% { transform: rotate(14deg); }
+        20% { transform: rotate(-8deg); }
+        30% { transform: rotate(14deg); }
+        40% { transform: rotate(-4deg); }
+        50% { transform: rotate(10deg); }
+        60% { transform: rotate(0deg); }
+        100% { transform: rotate(0deg); }
+    }
+    
+    /* Model selection styling */
+    .model-selection {
+        background-color: #1A1A1A;
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Dropdown styling */
+    .stSelectbox > div > div {
+        background-color: #2A2A2A;
+        color: #E0E0E0;
+        border: 1px solid #444444;
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #1A1A1A;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: #444444;
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: #555555;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -414,6 +479,12 @@ def main():
             <span style="color: white; opacity: 0.8;">Powered by multiple AI models</span>
         </div>
     </div>
+    
+    <div class="welcome-header">
+        <span class="wave-emoji">👋</span>
+        <h2>Welcome to ALL.AI</h2>
+    </div>
+    <p style="text-align: center; margin-bottom: 20px;">Start a conversation with multiple AI models or upload a file for analysis.</p>
     """, unsafe_allow_html=True)
     
     # Sidebar
