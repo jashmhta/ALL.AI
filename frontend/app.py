@@ -602,9 +602,13 @@ def main():
             send_button = st.button("Send", use_container_width=True)
         
         if send_button and user_input and not st.session_state.processing:
-            process_user_input(user_input)
-            # Clear input after sending
-            st.session_state.user_input = ""
+            try:
+                process_user_input(user_input)
+                # Clear input after sending
+                st.session_state.user_input = ""
+            except Exception as e:
+                st.error(f"Error processing message: {str(e)}")
+                st.session_state.processing = False
         
         st.markdown('</div>', unsafe_allow_html=True)
     

@@ -9,16 +9,28 @@ class LlamaClient:
         if not self.api_key:
             raise ValueError("Llama API key is required")
         
-        # Using the Together.ai API for Llama access
-        self.api_url = "https://api.together.xyz/v1/completions"
-        self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        self.model = "togethercomputer/llama-2-7b-chat"  # Using a more accessible model
+        try:
+            # Using the Together.ai API for Llama access
+            self.api_url = "https://api.together.xyz/v1/completions"
+            self.headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            self.model = "togethercomputer/llama-2-7b-chat"  # Using a more accessible model
+            self.initialized = True
+        except Exception as e:
+            print(f"Error initializing Llama client: {e}")
+            self.initialized = False
     
     async def generate_response(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """Generate a response from Llama API."""
+        if not self.initialized:
+            return {
+                "text": "Llama client is not properly initialized.",
+                "model": "llama-2-7b-chat",
+                "success": False
+            }
+            
         try:
             payload = {
                 "model": self.model,

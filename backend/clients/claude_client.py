@@ -9,12 +9,23 @@ class ClaudeClient:
         if not self.api_key:
             raise ValueError("Claude API key is required")
         
-        # Initialize Anthropic client with just the API key
-        self.client = Anthropic(api_key=self.api_key)
-        self.model = "claude-3-opus-20240229"
+        try:
+            # Initialize Anthropic client with just the API key
+            self.client = Anthropic(api_key=self.api_key)
+            self.model = "claude-3-opus-20240229"
+        except Exception as e:
+            print(f"Error initializing Claude client: {e}")
+            self.client = None
     
     async def generate_response(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """Generate a response from Claude API."""
+        if not self.client:
+            return {
+                "text": "Claude client is not properly initialized.",
+                "model": "claude-3-opus-20240229",
+                "success": False
+            }
+            
         try:
             response = self.client.messages.create(
                 model=self.model,
