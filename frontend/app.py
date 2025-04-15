@@ -21,134 +21,305 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for dark theme and better UI
+# Custom CSS for professional and aesthetic UI
 st.markdown("""
 <style>
     /* Main theme colors and styling */
     :root {
-        --primary-color: #7C4DFF;
-        --secondary-color: #00B8D4;
-        --background-color: #121212;
-        --surface-color: #1E1E1E;
-        --on-surface-color: #E0E0E0;
-        --error-color: #CF6679;
-        --success-color: #03DAC6;
-        --border-radius: 8px;
-        --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        --primary-color: #6C63FF;
+        --primary-light: rgba(108, 99, 255, 0.1);
+        --primary-dark: #5A52D9;
+        --secondary-color: #00BFA6;
+        --secondary-light: rgba(0, 191, 166, 0.1);
+        --background-color: #0F172A;
+        --surface-color: #1E293B;
+        --surface-light: #334155;
+        --on-surface-color: #F8FAFC;
+        --on-surface-secondary: #CBD5E1;
+        --error-color: #EF4444;
+        --success-color: #10B981;
+        --warning-color: #F59E0B;
+        --info-color: #3B82F6;
+        --border-radius: 12px;
+        --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --transition-speed: 0.3s;
+        --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     
     /* General styling */
+    html, body, [class*="css"] {
+        font-family: var(--font-primary);
+    }
+    
     .stApp {
         background-color: var(--background-color);
         color: var(--on-surface-color);
     }
     
+    /* Streamlit component overrides */
+    .stTextInput > div > div > input {
+        background-color: var(--surface-color);
+        color: var(--on-surface-color);
+        border-radius: var(--border-radius);
+        border: 1px solid var(--surface-light);
+        padding: 1rem;
+    }
+    
+    .stTextArea > div > div > textarea {
+        background-color: var(--surface-color);
+        color: var(--on-surface-color);
+        border-radius: var(--border-radius);
+        border: 1px solid var(--surface-light);
+        padding: 1rem;
+        font-size: 1rem;
+    }
+    
+    .stButton > button {
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: var(--border-radius);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        transition: all var(--transition-speed);
+    }
+    
+    .stButton > button:hover {
+        background-color: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(108, 99, 255, 0.3);
+    }
+    
+    .stButton > button:active {
+        transform: translateY(0);
+    }
+    
+    .stCheckbox > div > label {
+        color: var(--on-surface-color);
+    }
+    
+    .stExpander > div > div > div > div > div > p {
+        color: var(--on-surface-color);
+    }
+    
+    .stSlider > div > div > div {
+        color: var(--on-surface-color);
+    }
+    
+    .stSlider > div > div > div > div > div > div {
+        background-color: var(--primary-color);
+    }
+    
     /* Header styling */
     .main-header {
-        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-        padding: 1rem;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        padding: 1.5rem;
         border-radius: var(--border-radius);
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        box-shadow: var(--card-shadow);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .main-header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJwYXR0ZXJuIiB4PSIwIiB5PSIwIiB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHBhdHRlcm5UcmFuc2Zvcm09InJvdGF0ZSgzMCkiPjxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSI+PC9yZWN0PjwvcGF0dGVybj48L2RlZnM+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNwYXR0ZXJuKSI+PC9yZWN0Pjwvc3ZnPg==');
+        opacity: 0.3;
     }
     
     .main-header h1 {
         margin: 0;
         color: white;
-        font-size: 2rem;
+        font-size: 2.5rem;
+        font-weight: 800;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        position: relative;
+        z-index: 1;
+    }
+    
+    .main-header-subtitle {
+        color: white;
+        opacity: 0.9;
+        font-size: 1.1rem;
+        font-weight: 500;
+        position: relative;
+        z-index: 1;
     }
     
     /* Chat container styling */
     .chat-container {
         background-color: var(--surface-color);
         border-radius: var(--border-radius);
-        padding: 1rem;
-        margin-bottom: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
         box-shadow: var(--card-shadow);
-        max-height: 600px;
+        max-height: 650px;
         overflow-y: auto;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        position: relative;
+    }
+    
+    .chat-container::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .chat-container::-webkit-scrollbar-track {
+        background: var(--surface-color);
+        border-radius: 10px;
+    }
+    
+    .chat-container::-webkit-scrollbar-thumb {
+        background: var(--surface-light);
+        border-radius: 10px;
+    }
+    
+    .chat-container::-webkit-scrollbar-thumb:hover {
+        background: var(--primary-color);
     }
     
     /* Message styling */
     .message {
-        margin-bottom: 1rem;
-        padding: 0.75rem;
+        margin-bottom: 1.5rem;
+        padding: 1rem;
         border-radius: var(--border-radius);
         position: relative;
+        animation: fadeIn 0.3s ease-in-out;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .message:hover {
+        transform: translateY(-2px);
     }
     
     .user-message {
-        background-color: rgba(124, 77, 255, 0.2);
+        background-color: var(--primary-light);
         border-left: 4px solid var(--primary-color);
-        margin-left: 2rem;
-        margin-right: 0.5rem;
+        margin-left: 3rem;
+        margin-right: 1rem;
     }
     
     .assistant-message {
-        background-color: rgba(0, 184, 212, 0.1);
+        background-color: var(--secondary-light);
         border-left: 4px solid var(--secondary-color);
-        margin-right: 2rem;
-        margin-left: 0.5rem;
+        margin-right: 3rem;
+        margin-left: 1rem;
     }
     
     .message-header {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 0.5rem;
-        font-size: 0.85rem;
-        color: rgba(224, 224, 224, 0.7);
+        margin-bottom: 0.75rem;
+        font-size: 0.9rem;
+        color: var(--on-surface-secondary);
+    }
+    
+    .message-sender {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .message-timestamp {
+        font-size: 0.8rem;
+        opacity: 0.8;
     }
     
     .message-content {
         white-space: pre-wrap;
+        line-height: 1.6;
+        color: var(--on-surface-color);
     }
     
     /* Avatar styling */
     .avatar {
-        width: 32px;
-        height: 32px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         position: absolute;
-        top: 0.75rem;
+        top: 1rem;
         background-size: cover;
         background-position: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.1);
     }
     
     .user-avatar {
-        left: -40px;
-        background-color: var(--primary-color);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
+        left: -50px;
+        background: linear-gradient(135deg, #6C63FF, #5A52D9);
     }
     
     .assistant-avatar {
-        right: -40px;
-        background-color: var(--secondary-color);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
+        right: -50px;
+        background: linear-gradient(135deg, #00BFA6, #00A896);
     }
     
     /* Input area styling */
     .input-area {
         background-color: var(--surface-color);
         border-radius: var(--border-radius);
-        padding: 1rem;
+        padding: 1.5rem;
         box-shadow: var(--card-shadow);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        position: relative;
+    }
+    
+    .input-area::before {
+        content: "";
+        position: absolute;
+        top: -2px;
+        left: 5%;
+        right: 5%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        border-radius: 100%;
     }
     
     /* Sidebar styling */
     .sidebar .stButton button {
         width: 100%;
         border-radius: var(--border-radius);
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.75rem;
+        background-color: var(--surface-light);
+        color: var(--on-surface-color);
+        border: none;
+        transition: all var(--transition-speed);
+    }
+    
+    .sidebar .stButton button:hover {
+        background-color: var(--primary-color);
+        color: white;
+    }
+    
+    /* Section headers */
+    .sidebar h3 {
+        color: var(--on-surface-color);
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--surface-light);
     }
     
     /* Tabs styling */
@@ -159,63 +330,74 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {
         background-color: var(--surface-color);
         border-radius: var(--border-radius) var(--border-radius) 0 0;
-        padding: 0.5rem 1rem;
+        padding: 0.75rem 1.25rem;
         border: none !important;
+        color: var(--on-surface-secondary);
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: rgba(124, 77, 255, 0.2);
+        background-color: var(--primary-light);
+        color: var(--primary-color) !important;
+        font-weight: 600;
         border-bottom: 2px solid var(--primary-color) !important;
     }
     
     /* Loading animation */
     @keyframes pulse {
-        0% { opacity: 0.6; }
-        50% { opacity: 1; }
-        100% { opacity: 0.6; }
+        0% { transform: scale(0.8); opacity: 0.6; }
+        50% { transform: scale(1); opacity: 1; }
+        100% { transform: scale(0.8); opacity: 0.6; }
     }
     
     .loading-indicator {
         display: flex;
         align-items: center;
-        margin: 1rem 0;
+        justify-content: center;
+        margin: 1.5rem 0;
+        gap: 0.5rem;
     }
     
     .loading-dot {
-        width: 8px;
-        height: 8px;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
-        background-color: var(--primary-color);
-        margin: 0 4px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
         animation: pulse 1.5s infinite;
     }
     
     .loading-dot:nth-child(2) {
         animation-delay: 0.2s;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     }
     
     .loading-dot:nth-child(3) {
         animation-delay: 0.4s;
+        background: linear-gradient(135deg, var(--secondary-color), var(--secondary-color));
     }
     
     /* Feedback buttons */
     .feedback-buttons {
         display: flex;
-        gap: 0.5rem;
-        margin-top: 0.5rem;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+        justify-content: flex-end;
     }
     
     .feedback-button {
         background: none;
         border: none;
         cursor: pointer;
-        padding: 0.25rem 0.5rem;
+        padding: 0.35rem 0.75rem;
         border-radius: var(--border-radius);
-        transition: background-color 0.2s;
+        transition: all var(--transition-speed);
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.9rem;
     }
     
     .feedback-button:hover {
-        background-color: rgba(224, 224, 224, 0.1);
+        background-color: rgba(255, 255, 255, 0.1);
     }
     
     .feedback-button.positive {
@@ -228,51 +410,255 @@ st.markdown("""
     
     /* File upload area */
     .file-upload-area {
-        border: 2px dashed rgba(124, 77, 255, 0.5);
+        border: 2px dashed rgba(108, 99, 255, 0.3);
         border-radius: var(--border-radius);
-        padding: 1rem;
+        padding: 2rem 1.5rem;
         text-align: center;
-        margin-bottom: 1rem;
-        transition: border-color 0.2s;
+        margin-bottom: 1.5rem;
+        transition: all var(--transition-speed);
+        background-color: rgba(108, 99, 255, 0.05);
     }
     
     .file-upload-area:hover {
         border-color: var(--primary-color);
+        background-color: rgba(108, 99, 255, 0.1);
     }
     
     /* File preview */
     .file-preview {
-        background-color: rgba(0, 184, 212, 0.1);
+        background-color: var(--secondary-light);
         border-radius: var(--border-radius);
-        padding: 0.75rem;
-        margin-bottom: 1rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid var(--secondary-color);
     }
     
     .file-preview-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        margin-bottom: 0.75rem;
+        font-size: 0.95rem;
+    }
+    
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: var(--on-surface-secondary);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 400px;
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1.5rem;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        opacity: 0.8;
+    }
+    
+    .empty-state-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .empty-state-subtitle {
+        font-size: 1.1rem;
+        opacity: 0.8;
+        max-width: 500px;
+        line-height: 1.6;
+    }
+    
+    /* Stats cards */
+    .stats-card {
+        background-color: var(--surface-color);
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid var(--primary-color);
+        transition: all var(--transition-speed);
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--card-shadow);
+    }
+    
+    .stats-card-title {
+        font-size: 1rem;
+        font-weight: 600;
         margin-bottom: 0.5rem;
+        color: var(--on-surface-color);
+    }
+    
+    .stats-card-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary-color);
     }
     
     /* Mobile responsiveness */
-    @media (max-width: 768px) {
+    @media (max-width: 992px) {
         .main-header {
             flex-direction: column;
             align-items: flex-start;
+            padding: 1.25rem;
+        }
+        
+        .main-header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
         }
         
         .user-message {
-            margin-left: 0.5rem;
+            margin-left: 1rem;
         }
         
         .assistant-message {
-            margin-right: 0.5rem;
+            margin-right: 1rem;
         }
         
         .avatar {
+            width: 32px;
+            height: 32px;
+            font-size: 1rem;
+        }
+        
+        .user-avatar {
+            left: -40px;
+        }
+        
+        .assistant-avatar {
+            right: -40px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .avatar {
             display: none;
         }
+        
+        .user-message, .assistant-message {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        
+        .chat-container {
+            padding: 1rem;
+        }
+        
+        .message {
+            padding: 0.75rem;
+        }
+    }
+    
+    /* Code blocks */
+    code {
+        font-family: 'JetBrains Mono', monospace;
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 0.2em 0.4em;
+        border-radius: 3px;
+        font-size: 0.9em;
+    }
+    
+    pre {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 1em;
+        border-radius: var(--border-radius);
+        overflow-x: auto;
+        border-left: 3px solid var(--primary-color);
+    }
+    
+    pre code {
+        background-color: transparent;
+        padding: 0;
+        font-size: 0.9em;
+        color: var(--on-surface-color);
+    }
+    
+    /* Syntax highlighting */
+    .token.comment,
+    .token.prolog,
+    .token.doctype,
+    .token.cdata {
+        color: #6c7a89;
+    }
+    
+    .token.punctuation {
+        color: #f8f8f2;
+    }
+    
+    .namespace {
+        opacity: 0.7;
+    }
+    
+    .token.property,
+    .token.tag,
+    .token.constant,
+    .token.symbol,
+    .token.deleted {
+        color: #ff79c6;
+    }
+    
+    .token.boolean,
+    .token.number {
+        color: #bd93f9;
+    }
+    
+    .token.selector,
+    .token.attr-name,
+    .token.string,
+    .token.char,
+    .token.builtin,
+    .token.inserted {
+        color: #50fa7b;
+    }
+    
+    .token.operator,
+    .token.entity,
+    .token.url,
+    .language-css .token.string,
+    .style .token.string {
+        color: #f8f8f2;
+    }
+    
+    .token.atrule,
+    .token.attr-value,
+    .token.keyword {
+        color: #8be9fd;
+    }
+    
+    .token.function,
+    .token.class-name {
+        color: #ffb86c;
+    }
+    
+    .token.regex,
+    .token.important,
+    .token.variable {
+        color: #f1fa8c;
+    }
+    
+    .token.important,
+    .token.bold {
+        font-weight: bold;
+    }
+    
+    .token.italic {
+        font-style: italic;
+    }
+    
+    .token.entity {
+        cursor: help;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -437,7 +823,16 @@ def clear_conversation():
 
 # Function to get model recommendations
 def get_model_recommendations():
-    return st.session_state.app.get_model_recommendations()
+    try:
+        if 'app' in st.session_state and hasattr(st.session_state.app, 'get_model_recommendations'):
+            return st.session_state.app.get_model_recommendations()
+        else:
+            return {"overall_best": [], "creative": [], "factual": [], "technical": [], 
+                   "mathematical": [], "analytical": [], "instructional": []}
+    except Exception as e:
+        st.error(f"Error getting model recommendations: {str(e)}")
+        return {"overall_best": [], "creative": [], "factual": [], "technical": [], 
+               "mathematical": [], "analytical": [], "instructional": []}
 
 # Main layout
 def main():
@@ -445,18 +840,24 @@ def main():
     st.markdown("""
     <div class="main-header">
         <h1>🤖 ALL.AI - Multi-AI Chat Interface</h1>
-        <div>
-            <span style="color: white; opacity: 0.8;">Powered by multiple AI models</span>
+        <div class="main-header-subtitle">
+            Harness the power of multiple AI models in one elegant interface
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     # Sidebar
     with st.sidebar:
-        st.markdown("### Settings")
+        st.markdown("### AI Settings")
         
         # Model selection
-        available_models = st.session_state.app.get_available_models()
+        available_models = []
+        try:
+            if 'app' in st.session_state and hasattr(st.session_state.app, 'get_available_models'):
+                available_models = st.session_state.app.get_available_models()
+        except Exception as e:
+            st.error(f"Error getting available models: {str(e)}")
+        
         if available_models:
             st.session_state.selected_model = st.selectbox(
                 "Select AI Model", 
@@ -472,7 +873,13 @@ def main():
         st.session_state.use_multiple = st.checkbox("Get responses from all available models", value=False)
         
         # Synthesis option
-        synthesis_available = st.session_state.app.is_synthesis_available()
+        synthesis_available = False
+        try:
+            if 'app' in st.session_state and hasattr(st.session_state.app, 'is_synthesis_available'):
+                synthesis_available = st.session_state.app.is_synthesis_available()
+        except Exception as e:
+            st.error(f"Error checking synthesis availability: {str(e)}")
+            
         if synthesis_available:
             st.session_state.synthesize = st.checkbox("Synthesize responses using Llama", value=False, disabled=not st.session_state.use_multiple)
         else:
@@ -485,26 +892,38 @@ def main():
             st.session_state.max_tokens = st.slider("Max Tokens", 100, 2000, 1000, 100)
         
         # History management
-        st.markdown("### History")
-        if st.button("Save Conversation"):
-            save_conversation()
-        
-        if st.button("Clear Conversation"):
-            clear_conversation()
+        st.markdown("### Conversation")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Save", use_container_width=True):
+                save_conversation()
+        with col2:
+            if st.button("Clear", use_container_width=True):
+                clear_conversation()
         
         # Model recommendations
-        st.markdown("### Model Recommendations")
+        st.markdown("### Model Insights")
         recommendations = get_model_recommendations()
         if recommendations and "overall_best" in recommendations and recommendations["overall_best"]:
             best_model = recommendations["overall_best"][0]["model"]
-            st.info(f"Best overall model: {best_model}")
+            st.markdown(f"""
+            <div class="stats-card">
+                <div class="stats-card-title">Best Overall Model</div>
+                <div class="stats-card-value">{best_model}</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         # Categories with recommendations
         for category, models in recommendations.items():
             if category != "overall_best" and models:
-                with st.expander(f"{category.capitalize()} queries"):
+                with st.expander(f"{category.capitalize()} Queries"):
                     for model_data in models:
-                        st.write(f"- {model_data['model']}")
+                        st.markdown(f"""
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>{model_data['model']}</span>
+                            <span style="color: var(--primary-color); font-weight: 600;">{model_data.get('score', 0):.1f}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
     
     # Main chat area
     col1, col2 = st.columns([3, 1])
@@ -515,9 +934,13 @@ def main():
         
         if not st.session_state.messages:
             st.markdown("""
-            <div style="text-align: center; padding: 2rem; color: rgba(224, 224, 224, 0.6);">
-                <h3>👋 Welcome to ALL.AI</h3>
-                <p>Start a conversation with multiple AI models or upload a file for analysis.</p>
+            <div class="empty-state">
+                <div class="empty-state-icon">💬</div>
+                <div class="empty-state-title">Start a Conversation</div>
+                <div class="empty-state-subtitle">
+                    Ask anything and get responses from multiple AI models. 
+                    Compare different perspectives or get a synthesized answer.
+                </div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -534,8 +957,8 @@ def main():
                 <div class="message user-message">
                     <div class="user-avatar avatar">👤</div>
                     <div class="message-header">
-                        <span>You</span>
-                        <span>{timestamp}</span>
+                        <div class="message-sender">You</div>
+                        <div class="message-timestamp">{timestamp}</div>
                     </div>
                     <div class="message-content">{content}</div>
                 </div>
@@ -547,13 +970,17 @@ def main():
                 <div class="message assistant-message">
                     <div class="assistant-avatar avatar">🤖</div>
                     <div class="message-header">
-                        <span>Assistant{model_display}</span>
-                        <span>{timestamp}</span>
+                        <div class="message-sender">Assistant{model_display}</div>
+                        <div class="message-timestamp">{timestamp}</div>
                     </div>
                     <div class="message-content">{content}</div>
                     <div class="feedback-buttons">
-                        <button class="feedback-button positive" onclick="handleFeedback('{message_id}', '{model}', true)">👍</button>
-                        <button class="feedback-button negative" onclick="handleFeedback('{message_id}', '{model}', false)">👎</button>
+                        <button class="feedback-button positive" onclick="handleFeedback('{message_id}', '{model}', true)">
+                            <span>👍</span> Helpful
+                        </button>
+                        <button class="feedback-button negative" onclick="handleFeedback('{message_id}', '{model}', false)">
+                            <span>👎</span> Not helpful
+                        </button>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -613,7 +1040,7 @@ def main():
         
         # Input area
         st.markdown('<div class="input-area">', unsafe_allow_html=True)
-        user_input = st.text_area("Your message", height=100, key="user_input")
+        user_input = st.text_area("Your message", height=100, key="user_input", placeholder="Type your message here...")
         
         col1, col2 = st.columns([1, 5])
         with col1:
@@ -629,36 +1056,103 @@ def main():
     with col2:
         # Performance metrics
         with st.expander("Performance Metrics"):
-            metrics = st.session_state.app.get_performance_metrics()
+            metrics = {}
+            try:
+                if 'app' in st.session_state and hasattr(st.session_state.app, 'get_performance_metrics'):
+                    metrics = st.session_state.app.get_performance_metrics()
+            except Exception as e:
+                st.error(f"Error getting performance metrics: {str(e)}")
             
             if "overall" in metrics:
                 st.markdown("#### Overall")
-                st.write(f"Total requests: {metrics['overall']['total_requests']}")
-                st.write(f"Avg response time: {metrics['overall']['average_response_time']:.2f}s")
-                st.write(f"Success rate: {metrics['overall']['success_rate']:.1f}%")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"""
+                    <div class="stats-card">
+                        <div class="stats-card-title">Total Requests</div>
+                        <div class="stats-card-value">{metrics['overall']['total_requests']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f"""
+                    <div class="stats-card">
+                        <div class="stats-card-title">Success Rate</div>
+                        <div class="stats-card-value">{metrics['overall']['success_rate']:.1f}%</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown(f"""
+                <div class="stats-card">
+                    <div class="stats-card-title">Avg Response Time</div>
+                    <div class="stats-card-value">{metrics['overall']['average_response_time']:.2f}s</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             if "cache" in metrics:
                 st.markdown("#### Cache")
-                st.write(f"Active entries: {metrics['cache'].get('active_entries', 0)}")
-                st.write(f"Hit rate: {metrics['cache'].get('hit_rate', 0):.1f}%")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"""
+                    <div class="stats-card">
+                        <div class="stats-card-title">Active Entries</div>
+                        <div class="stats-card-value">{metrics['cache'].get('active_entries', 0)}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f"""
+                    <div class="stats-card">
+                        <div class="stats-card-title">Hit Rate</div>
+                        <div class="stats-card-value">{metrics['cache'].get('hit_rate', 0):.1f}%</div>
+                    </div>
+                    """, unsafe_allow_html=True)
         
         # Model performance
         with st.expander("Model Performance"):
             if "models" in metrics:
                 for model, model_metrics in metrics["models"].items():
                     st.markdown(f"#### {model}")
-                    st.write(f"Requests: {model_metrics['requests']}")
-                    st.write(f"Avg time: {model_metrics['average_response_time']:.2f}s")
-                    st.write(f"Success: {model_metrics['success_rate']:.1f}%")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown(f"""
+                        <div class="stats-card">
+                            <div class="stats-card-title">Requests</div>
+                            <div class="stats-card-value">{model_metrics['requests']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with col2:
+                        st.markdown(f"""
+                        <div class="stats-card">
+                            <div class="stats-card-title">Success</div>
+                            <div class="stats-card-value">{model_metrics['success_rate']:.1f}%</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    st.markdown(f"""
+                    <div class="stats-card">
+                        <div class="stats-card-title">Avg Time</div>
+                        <div class="stats-card-value">{model_metrics['average_response_time']:.2f}s</div>
+                    </div>
+                    """, unsafe_allow_html=True)
         
         # Fallback statistics
         with st.expander("Fallback Statistics"):
-            fallback_stats = st.session_state.app.get_fallback_statistics()
+            fallback_stats = {}
+            try:
+                if 'app' in st.session_state and hasattr(st.session_state.app, 'get_fallback_statistics'):
+                    fallback_stats = st.session_state.app.get_fallback_statistics()
+            except Exception as e:
+                st.error(f"Error getting fallback statistics: {str(e)}")
+                
             for primary, fallbacks in fallback_stats.items():
                 if fallbacks:
                     st.markdown(f"#### When {primary} fails:")
                     for fallback in fallbacks:
-                        st.write(f"- {fallback['model']}: {fallback['success_rate']:.1f}")
+                        st.markdown(f"""
+                        <div class="stats-card">
+                            <div class="stats-card-title">{fallback['model']}</div>
+                            <div class="stats-card-value">{fallback['success_rate']:.1f}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
 # Run the app
 if __name__ == "__main__":
