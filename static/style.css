@@ -6,11 +6,12 @@
     color: #E0E0E0;
 }
 
-/* Sidebar styling with golden accent */
+/* Sidebar styling with enhanced golden accent */
 .stSidebar {
     background-color: #1A1A1A;
-    border-right: 2px solid #D4AF37; /* Golden border between sidebar and main content */
-    box-shadow: 0 0 10px rgba(212, 175, 55, 0.3); /* Subtle golden glow */
+    border-right: 3px solid #D4AF37; /* Enhanced golden border between sidebar and main content */
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.4); /* Enhanced golden glow */
+    position: relative; /* For absolute positioning of pseudo-elements */
 }
 
 .stSidebar .sidebar-content {
@@ -24,8 +25,21 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
+    height: 4px;
     background: linear-gradient(90deg, #D4AF37, #F5D76E, #D4AF37);
+}
+
+/* Additional golden accent line at the right edge of sidebar */
+.stSidebar:after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #D4AF37, #F5D76E, #D4AF37);
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.6);
+    z-index: 1000;
 }
 
 /* Input fields, text areas, and selectboxes */
