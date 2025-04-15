@@ -1,0 +1,9 @@
+# Multi-AI App Deployment Configuration
+
+sdk_version: 2
+app_file: app.py
+models:
+  - anthropic/claude-3-opus
+  - openai/gpt-4
+  - google/gemini-pro
+  - meta-llama/llama-3-70b
