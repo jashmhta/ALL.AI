@@ -6,14 +6,26 @@
     color: #E0E0E0;
 }
 
-/* Sidebar styling */
+/* Sidebar styling with golden accent */
 .stSidebar {
     background-color: #1A1A1A;
-    border-right: 1px solid #333333;
+    border-right: 2px solid #D4AF37; /* Golden border between sidebar and main content */
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.3); /* Subtle golden glow */
 }
 
 .stSidebar .sidebar-content {
     background-color: #1A1A1A;
+}
+
+/* Golden accent line at the top of sidebar */
+.stSidebar:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #D4AF37, #F5D76E, #D4AF37);
 }
 
 /* Input fields, text areas, and selectboxes */
@@ -44,9 +56,12 @@
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* Headers */
+/* Headers with golden accents */
 h1, h2, h3, h4, h5, h6 {
     color: #FFFFFF;
+    border-bottom: 1px solid #D4AF37;
+    padding-bottom: 0.3rem;
+    text-shadow: 0 0 5px rgba(212, 175, 55, 0.3);
 }
 
 /* Markdown text */
@@ -60,12 +75,14 @@ header {
     border-bottom: 1px solid #333333;
 }
 
-/* Chat container */
+/* Chat container with golden accents */
 .chat-container {
     background-color: #121212;
     border-radius: 10px;
     padding: 1rem;
     margin-bottom: 1rem;
+    border-left: 2px solid #D4AF37;
+    box-shadow: -3px 0 10px rgba(212, 175, 55, 0.2);
 }
 
 /* Message bubbles */
@@ -92,12 +109,14 @@ header {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-/* Model selection */
+/* Model selection with golden accents */
 .model-selection {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     margin: 1rem 0;
+    border-bottom: 1px solid #D4AF37;
+    padding-bottom: 1rem;
 }
 
 .model-option {
@@ -117,7 +136,8 @@ header {
 
 .model-option.selected {
     background-color: #444444;
-    border: 1px solid #666666;
+    border: 1px solid #D4AF37;
+    box-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
 }
 
 .model-icon {
@@ -126,7 +146,7 @@ header {
     border-radius: 50%;
 }
 
-/* Code blocks */
+/* Code blocks with golden accents */
 pre {
     background-color: #1A1A1A;
     border-radius: 8px;
@@ -134,6 +154,7 @@ pre {
     overflow-x: auto;
     margin: 1rem 0;
     position: relative;
+    border-left: 2px solid #D4AF37;
 }
 
 code {
