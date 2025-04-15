@@ -1,0 +1,365 @@
+/* GenSpark-style CSS for Multi-AI App */
+
+/* Main app background and text colors */
+.stApp {
+    background-color: #121212;
+    color: #E0E0E0;
+}
+
+/* Sidebar styling */
+.stSidebar {
+    background-color: #1A1A1A;
+    border-right: 1px solid #333333;
+}
+
+.stSidebar .sidebar-content {
+    background-color: #1A1A1A;
+}
+
+/* Input fields, text areas, and selectboxes */
+.stTextInput, .stTextArea, .stSelectbox, .stMultiselect {
+    background-color: #2D2D2D;
+    color: #E0E0E0;
+    border-color: #444444;
+    border-radius: 8px;
+}
+
+.stTextInput:focus, .stTextArea:focus, .stSelectbox:focus, .stMultiselect:focus {
+    border-color: #6E6E6E;
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: #333333;
+    color: #E0E0E0;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    background-color: #444444;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Headers */
+h1, h2, h3, h4, h5, h6 {
+    color: #FFFFFF;
+}
+
+/* Markdown text */
+.stMarkdown {
+    color: #E0E0E0;
+}
+
+/* Header */
+header {
+    background-color: #1A1A1A !important;
+    border-bottom: 1px solid #333333;
+}
+
+/* Chat container */
+.chat-container {
+    background-color: #121212;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Message bubbles */
+.user-message {
+    background-color: #2D2D2D;
+    color: #E0E0E0;
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    margin: 0.5rem 0;
+    max-width: 80%;
+    align-self: flex-end;
+    margin-left: auto;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.assistant-message {
+    background-color: #1E1E1E;
+    color: #E0E0E0;
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    margin: 0.5rem 0;
+    max-width: 80%;
+    align-self: flex-start;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Model selection */
+.model-selection {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.model-option {
+    background-color: #2D2D2D;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.model-option:hover {
+    background-color: #3D3D3D;
+}
+
+.model-option.selected {
+    background-color: #444444;
+    border: 1px solid #666666;
+}
+
+.model-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+}
+
+/* Code blocks */
+pre {
+    background-color: #1A1A1A;
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    position: relative;
+}
+
+code {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    color: #E0E0E0;
+}
+
+.copy-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background-color: #333333;
+    color: #E0E0E0;
+    border: none;
+    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.copy-button:hover {
+    background-color: #444444;
+}
+
+/* Expandable/collapsible sections */
+.expandable-section {
+    border: 1px solid #333333;
+    border-radius: 8px;
+    margin: 1rem 0;
+    overflow: hidden;
+}
+
+.expandable-header {
+    background-color: #1E1E1E;
+    padding: 0.8rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.expandable-content {
+    padding: 0 1rem;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.expandable-content.expanded {
+    max-height: 1000px;
+    padding: 1rem;
+}
+
+/* Thinking indicator */
+.thinking-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    color: #AAAAAA;
+}
+
+.thinking-dots {
+    display: flex;
+    gap: 0.2rem;
+}
+
+.thinking-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #AAAAAA;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+.thinking-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.thinking-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Syntax highlighting for code */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+    color: #6A9955;
+}
+
+.token.punctuation {
+    color: #D4D4D4;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+    color: #B5CEA8;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+    color: #CE9178;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+    color: #D4D4D4;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+    color: #569CD6;
+}
+
+.token.function,
+.token.class-name {
+    color: #DCDCAA;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+    color: #D16969;
+}
+
+/* Credit tracking display */
+.credit-display {
+    background-color: #1E1E1E;
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    margin: 1rem 0;
+}
+
+.credit-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #333333;
+}
+
+.credit-item:last-child {
+    border-bottom: none;
+}
+
+.credit-model {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.credit-amount {
+    font-weight: bold;
+}
+
+/* File upload area */
+.file-upload-area {
+    border: 2px dashed #444444;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    margin: 1rem 0;
+    transition: all 0.3s ease;
+}
+
+.file-upload-area:hover {
+    border-color: #666666;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.file-list {
+    margin-top: 1rem;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #1E1E1E;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    margin: 0.5rem 0;
+}
+
+.file-remove {
+    color: #E57373;
+    cursor: pointer;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .user-message, .assistant-message {
+        max-width: 90%;
+    }
+    
+    .model-selection {
+        flex-direction: column;
+    }
+}

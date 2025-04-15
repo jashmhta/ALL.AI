@@ -1,0 +1,130 @@
+{
+  "providers": {
+    "openai": {
+      "total_credits": 10.0,
+      "used_credits": 0.0192,
+      "last_updated": "2025-04-15T18:35:58.607696"
+    },
+    "claude": {
+      "total_credits": 10.0,
+      "used_credits": 0.03,
+      "last_updated": "2025-04-15T18:35:58.610731"
+    },
+    "gemini": {
+      "total_credits": 20.0,
+      "used_credits": 0.0,
+      "last_updated": "2025-04-15T18:35:58.606360"
+    },
+    "llama": {
+      "total_credits": 10.0,
+      "used_credits": 0.0,
+      "last_updated": "2025-04-15T18:35:58.609836"
+    },
+    "huggingface": {
+      "total_credits": 10.0,
+      "used_credits": 0.0,
+      "last_updated": "2025-04-15T18:33:36.090614"
+    },
+    "openrouter": {
+      "total_credits": 10.0,
+      "used_credits": 0.0,
+      "last_updated": "2025-04-15T18:33:36.090615"
+    },
+    "deepseek": {
+      "total_credits": 10.0,
+      "used_credits": 0.0,
+      "last_updated": "2025-04-15T18:33:36.090617"
+    }
+  },
+  "usage_history": [
+    {
+      "timestamp": "2025-04-15T18:33:36.091038",
+      "provider": "openai",
+      "model": "gpt-4",
+      "input_tokens": 100,
+      "output_tokens": 50,
+      "cost": 0.006
+    },
+    {
+      "timestamp": "2025-04-15T18:33:36.091475",
+      "provider": "openai",
+      "model": "gpt-4",
+      "input_tokens": 100,
+      "output_tokens": 50,
+      "cost": 0.006
+    },
+    {
+      "timestamp": "2025-04-15T18:33:36.092057",
+      "provider": "openai",
+      "model": "gpt-3.5-turbo",
+      "input_tokens": 200,
+      "output_tokens": 100,
+      "cost": 0.0006000000000000001
+    },
+    {
+      "timestamp": "2025-04-15T18:33:36.092554",
+      "provider": "claude",
+      "model": "claude-3-opus",
+      "input_tokens": 300,
+      "output_tokens": 150,
+      "cost": 0.009
+    },
+    {
+      "timestamp": "2025-04-15T18:33:36.093572",
+      "provider": "llama",
+      "model": "llama-3-70b",
+      "input_tokens": 300,
+      "output_tokens": 150,
+      "cost": 0.0009
+    },
+    {
+      "timestamp": "2025-04-15T18:33:36.094705",
+      "provider": "claude",
+      "model": "claude-3-opus",
+      "input_tokens": 200,
+      "output_tokens": 100,
+      "cost": 0.006
+    },
+    {
+      "timestamp": "2025-04-15T18:35:58.607388",
+      "provider": "openai",
+      "model": "gpt-4",
+      "input_tokens": 100,
+      "output_tokens": 50,
+      "cost": 0.006
+    },
+    {
+      "timestamp": "2025-04-15T18:35:58.607702",
+      "provider": "openai",
+      "model": "gpt-3.5-turbo",
+      "input_tokens": 200,
+      "output_tokens": 100,
+      "cost": 0.0006000000000000001
+    },
+    {
+      "timestamp": "2025-04-15T18:35:58.608304",
+      "provider": "claude",
+      "model": "claude-3-opus",
+      "input_tokens": 300,
+      "output_tokens": 150,
+      "cost": 0.009
+    },
+    {
+      "timestamp": "2025-04-15T18:35:58.609516",
+      "provider": "llama",
+      "model": "llama-3-70b",
+      "input_tokens": 300,
+      "output_tokens": 150,
+      "cost": 0.0009
+    },
+    {
+      "timestamp": "2025-04-15T18:35:58.610738",
+      "provider": "claude",
+      "model": "claude-3-opus",
+      "input_tokens": 200,
+      "output_tokens": 100,
+      "cost": 0.006
+    }
+  ],
+  "last_sync": "2025-04-15T18:33:36.090619"
+}
