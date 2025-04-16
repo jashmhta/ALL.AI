@@ -6,6 +6,8 @@ from .huggingface_client import HuggingFaceClient
 from .openrouter_client import OpenRouterClient
 from .deepseek_client import DeepSeekClient
 from .synthesis_client import SynthesisClient
+from .puter_client import PuterClient
+from .github_models_client import GitHubModelsClient
 
 __all__ = [
     'OpenAIClient',
@@ -15,5 +17,7 @@ __all__ = [
     'HuggingFaceClient',
     'OpenRouterClient',
     'DeepSeekClient',
-    'SynthesisClient'
+    'SynthesisClient',
+    'PuterClient',
+    'GitHubModelsClient'
 ]

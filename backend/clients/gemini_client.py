@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, List
 class GeminiClient:
     """
     Client for interacting with Google's Gemini API.
-    Supports Gemini Pro and Gemini Pro Vision models.
+    Supports Gemini Pro, Gemini Pro Vision, and Gemini 2.0 models.
     """
     
     def __init__(self, api_key: Optional[str] = None):
@@ -17,18 +17,30 @@ class GeminiClient:
             api_key: Google API key
         """
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
-        self.base_url = "https://generativelanguage.googleapis.com/v1"
+        self.base_url = "https://generativelanguage.googleapis.com/v1beta"
         self.available_models = {
             "gemini-pro": {
                 "max_tokens": 32768,
-                "supports_vision": False
+                "supports_vision": False,
+                "api_version": "v1"
             },
             "gemini-pro-vision": {
                 "max_tokens": 32768,
-                "supports_vision": True
+                "supports_vision": True,
+                "api_version": "v1"
+            },
+            "gemini-2.0-flash": {
+                "max_tokens": 32768,
+                "supports_vision": False,
+                "api_version": "v1beta"
+            },
+            "gemini-2.0-pro": {
+                "max_tokens": 32768,
+                "supports_vision": True,
+                "api_version": "v1beta"
             }
         }
-        self.default_model = "gemini-pro"
+        self.default_model = "gemini-2.0-flash"  # Updated default to use the newer model
     
     def query(self, 
              prompt: str, 
@@ -55,6 +67,10 @@ class GeminiClient:
         model = model or self.default_model
         if model not in self.available_models:
             model = self.default_model
+        
+        # Get the appropriate API version for the model
+        api_version = self.available_models[model]["api_version"]
+        api_url = f"https://generativelanguage.googleapis.com/{api_version}"
         
         # Check if API key is available
         if not self.api_key:
@@ -109,7 +125,7 @@ class GeminiClient:
         try:
             # Make API request
             response = requests.post(
-                f"{self.base_url}/models/{model}:generateContent?key={self.api_key}",
+                f"{api_url}/models/{model}:generateContent?key={self.api_key}",
                 json=data,
                 timeout=60
             )
@@ -163,6 +179,10 @@ class GeminiClient:
         model = model or self.default_model
         if model not in self.available_models:
             model = self.default_model
+        
+        # Get the appropriate API version for the model
+        api_version = self.available_models[model]["api_version"]
+        api_url = f"https://generativelanguage.googleapis.com/{api_version}"
         
         # Check if API key is available
         if not self.api_key:
@@ -218,7 +238,7 @@ class GeminiClient:
             # Make API request asynchronously
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.base_url}/models/{model}:generateContent?key={self.api_key}",
+                    f"{api_url}/models/{model}:generateContent?key={self.api_key}",
                     json=data,
                     timeout=60
                 ) as response:
@@ -242,6 +262,44 @@ class GeminiClient:
             error_msg = f"Error querying Gemini API: {str(e)}"
             print(error_msg)
             return f"Error: {error_msg}"
+    
+    def generate_response(self, 
+                         prompt: str, 
+                         max_tokens: int = 1000, 
+                         temperature: float = 0.7,
+                         conversation_history: Optional[List[Dict[str, Any]]] = None) -> str:
+        """
+        Generate a response based on prompt and conversation history.
+        
+        Args:
+            prompt: User prompt
+            max_tokens: Maximum tokens in response
+            temperature: Temperature for generation
+            conversation_history: Optional conversation history
+            
+        Returns:
+            Generated text response
+        """
+        # Format conversation history into a single context string
+        context = ""
+        if conversation_history:
+            for message in conversation_history:
+                role = message.get("role", "")
+                content = message.get("content", "")
+                if role == "user":
+                    context += f"User: {content}\n"
+                elif role == "assistant":
+                    context += f"Assistant: {content}\n"
+        
+        # Add the current prompt
+        full_prompt = f"{context}User: {prompt}\nAssistant:"
+        
+        # Query the model
+        return self.query(
+            prompt=full_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature
+        )
     
     def get_token_count(self, text: str) -> int:
         """
@@ -288,8 +346,18 @@ class GeminiClient:
             return False
         
         try:
+            # Try with v1beta first (for Gemini 2.0)
             response = requests.get(
-                f"{self.base_url}/models?key={self.api_key}",
+                f"https://generativelanguage.googleapis.com/v1beta/models?key={self.api_key}",
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                return True
+                
+            # If that fails, try with v1
+            response = requests.get(
+                f"https://generativelanguage.googleapis.com/v1/models?key={self.api_key}",
                 timeout=10
             )
             
