@@ -1,0 +1,90 @@
+name: deploy-multi-ai-app
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install huggingface_hub
+          pip install -r requirements.txt
+      
+      - name: Prepare files for deployment
+        run: |
+          mkdir -p deploy_temp
+          cp -r * deploy_temp/ || true
+          cp .env.example deploy_temp/.env || true
+          ls -la deploy_temp/
+      
+      - name: Deploy to Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<EOF
+          from huggingface_hub import HfApi
+          import os
+          import glob
+          
+          api = HfApi(token=os.environ['HF_TOKEN'])
+          space_name = "Jashmhta/multi-ai-app"
+          
+          # Check if space exists, if not create it
+          try:
+              space_info = api.get_space_info(repo_id=space_name)
+              print(f"Space exists: {space_info}")
+          except Exception as e:
+              print(f"Creating new space: {space_name}")
+              api.create_repo(
+                  repo_id=space_name,
+                  repo_type="space",
+                  space_sdk="streamlit",
+                  private=False
+              )
+          
+          # Get all files recursively
+          def get_all_files(directory):
+              all_files = []
+              for root, dirs, files in os.walk(directory):
+                  # Skip .git directory
+                  if '.git' in dirs:
+                      dirs.remove('.git')
+                  for file in files:
+                      file_path = os.path.join(root, file)
+                      all_files.append(file_path)
+              return all_files
+          
+          # Upload all files to the space
+          files = get_all_files("deploy_temp")
+          print(f"Found {len(files)} files to upload")
+          
+          for file_path in files:
+              # Get the relative path for the repo
+              repo_path = file_path.replace("deploy_temp/", "")
+              print(f"Uploading {file_path} to {repo_path}")
+              
+              try:
+                  api.upload_file(
+                      path_or_fileobj=file_path,
+                      path_in_repo=repo_path,
+                      repo_id=space_name,
+                      repo_type="space"
+                  )
+                  print(f"Successfully uploaded {repo_path}")
+              except Exception as e:
+                  print(f"Error uploading {repo_path}: {e}")
+          
+          print("Deployment completed!")
+          EOF
