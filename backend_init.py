@@ -51,9 +51,9 @@ def initialize_backend():
         "deepseek": create_openrouter_client(openrouter_api_key, "deepseek"),
         "openrouter": create_openrouter_client(openrouter_api_key, "openrouter"),
         "puter": PuterClient(),  # Add Puter client for free OpenAI access
-        "github_gpt4_mini": GitHubModelsClient(github_pat_token),  # GitHub Marketplace Models - GPT-4.1-mini
-        "github_deepseek": GitHubModelsClient(github_pat_token),  # GitHub Marketplace Models - DeepSeek-V3
-        "github_llama": GitHubModelsClient(github_pat_token)  # GitHub Marketplace Models - Llama 4 Scout
+        "github_gpt4_mini": GitHubModelsClient(github_pat_token, model="gpt-4.1-mini"),  # GitHub Marketplace Models - GPT-4.1-mini
+        "github_deepseek": GitHubModelsClient(github_pat_token, model="deepseek-v3-0324"),  # GitHub Marketplace Models - DeepSeek-V3
+        "github_llama": GitHubModelsClient(github_pat_token, model="llama-4-scout-17b-16e")  # GitHub Marketplace Models - Llama 4 Scout
     }
     backend["clients"] = clients
     
