@@ -38,6 +38,8 @@ from backend.clients.huggingface_client import HuggingFaceClient
 from backend.clients.openrouter_client import OpenRouterClient
 from backend.clients.deepseek_client import DeepSeekClient
 from backend.clients.synthesis_client import SynthesisClient
+from backend.clients.github_models_client import GitHubModelsClient
+from backend.clients.puter_client import PuterClient
 
 # Initialize session state
 if "initialized" not in st.session_state:
@@ -64,7 +66,11 @@ if "initialized" not in st.session_state:
         "llama": "Unlimited",
         "huggingface": "$5.00",
         "openrouter": "$8.00",
-        "deepseek": "$12.00"
+        "deepseek": "$12.00",
+        "github_gpt4_mini": "$25.00",
+        "github_deepseek": "$18.00",
+        "github_llama": "$22.00",
+        "puter": "Free"
     }
     st.session_state.initialized = True
 
@@ -88,6 +94,10 @@ def initialize_backend():
     )
     deepseek_client = DeepSeekClient(secret_manager.get_secret("DEEPSEEK_API_KEY"))
     synthesis_client = SynthesisClient()
+    github_gpt4_mini_client = GitHubModelsClient(secret_manager.get_secret("GITHUB_PAT_TOKEN"), model="gpt-4.1-mini")
+    github_deepseek_client = GitHubModelsClient(secret_manager.get_secret("GITHUB_PAT_TOKEN"), model="deepseek-v3")
+    github_llama_client = GitHubModelsClient(secret_manager.get_secret("GITHUB_PAT_TOKEN"), model="llama-4-scout")
+    puter_client = PuterClient()
     
     return {
         "secret_manager": secret_manager,
@@ -103,7 +113,11 @@ def initialize_backend():
             "huggingface": huggingface_client,
             "openrouter": openrouter_client,
             "deepseek": deepseek_client,
-            "synthesis": synthesis_client
+            "synthesis": synthesis_client,
+            "github_gpt4_mini": github_gpt4_mini_client,
+            "github_deepseek": github_deepseek_client,
+            "github_llama": github_llama_client,
+            "puter": puter_client
         }
     }
 
@@ -122,11 +136,11 @@ with main_container:
     
     # Sidebar (left column)
     with col1:
-        st.markdown("<h2>Multi-AI Interface</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 class='app-title'>Multi-AI Interface</h2>", unsafe_allow_html=True)
         st.markdown("<hr/>", unsafe_allow_html=True)
         
         # Model selection
-        st.markdown("<h3>Model Selection</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 class='section-header'>Model Selection</h3>", unsafe_allow_html=True)
         
         # Get available models based on API keys
         available_models = backend["secret_manager"].get_available_models()
@@ -147,6 +161,12 @@ with main_container:
             provider_options.append("OpenRouter")
         if available_models["deepseek"]:
             provider_options.append("DeepSeek")
+        if available_models.get("github_pat_token"):
+            provider_options.append("GitHub-GPT4-Mini")
+            provider_options.append("GitHub-DeepSeek")
+            provider_options.append("GitHub-Llama")
+        if available_models.get("puter"):
+            provider_options.append("Puter")
         
         # Add synthesis option if at least two providers are available
         if len(provider_options) >= 2:
@@ -154,17 +174,19 @@ with main_container:
         
         # If no providers are available, show placeholder options
         if not provider_options:
-            provider_options = ["OpenAI", "Claude", "Gemini", "Llama", "HuggingFace", "OpenRouter", "DeepSeek", "Mixture-of-Agents"]
+            provider_options = ["OpenAI", "Claude", "Gemini", "Llama", "HuggingFace", "OpenRouter", "DeepSeek", 
+                               "GitHub-GPT4-Mini", "GitHub-DeepSeek", "GitHub-Llama", "Puter", "Mixture-of-Agents"]
         
         # Create model selection UI
-        all_models = ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek"]
+        all_models = ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", 
+                     "github_gpt4_mini", "github_deepseek", "github_llama", "puter"]
         
         if st.session_state.synthesis_mode:
             selected_models = st.session_state.synthesis_models
             st.markdown(create_model_selection(all_models, selected_models), unsafe_allow_html=True)
             
             # Synthesis method
-            st.markdown("<h4>Synthesis Method</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 class='subsection-header'>Synthesis Method</h4>", unsafe_allow_html=True)
             synthesis_method = st.radio(
                 "Synthesis Method",
                 ["Parallel", "Sequential", "Debate"],
@@ -179,32 +201,58 @@ with main_container:
                 provider_options,
                 index=provider_options.index("OpenAI") if "OpenAI" in provider_options else 0,
                 label_visibility="collapsed"
-            ).lower().split()[0]  # Extract first word and convert to lowercase
+            )
             
-            if selected_provider == "mixture-of-agents":
+            # Convert provider name to backend client key
+            provider_key_map = {
+                "OpenAI": "openai",
+                "Claude": "claude",
+                "Gemini": "gemini",
+                "Llama": "llama",
+                "HuggingFace": "huggingface",
+                "OpenRouter": "openrouter",
+                "DeepSeek": "deepseek",
+                "GitHub-GPT4-Mini": "github_gpt4_mini",
+                "GitHub-DeepSeek": "github_deepseek",
+                "GitHub-Llama": "github_llama",
+                "Puter": "puter",
+                "Mixture-of-Agents": "mixture-of-agents"
+            }
+            
+            selected_provider_key = provider_key_map.get(selected_provider, selected_provider.lower().replace("-", "_"))
+            
+            if selected_provider_key == "mixture-of-agents":
                 st.session_state.synthesis_mode = True
                 st.session_state.synthesis_models = ["openai", "claude"]
-                st.experimental_rerun()
+                st.rerun()
             
-            st.session_state.current_provider = selected_provider
+            st.session_state.current_provider = selected_provider_key
             
             # Model options based on provider
             model_options = []
             
-            if selected_provider == "openai":
+            if selected_provider_key == "openai":
                 model_options = ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
-            elif selected_provider == "claude":
+            elif selected_provider_key == "claude":
                 model_options = ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]
-            elif selected_provider == "gemini":
-                model_options = ["gemini-pro", "gemini-pro-vision"]
-            elif selected_provider == "llama":
+            elif selected_provider_key == "gemini":
+                model_options = ["gemini-pro", "gemini-2.0-flash", "gemini-pro-vision"]
+            elif selected_provider_key == "llama":
                 model_options = ["llama-3-70b", "llama-3-8b"]
-            elif selected_provider == "huggingface":
+            elif selected_provider_key == "huggingface":
                 model_options = ["mistral-7b", "falcon-40b", "llama-2-13b"]
-            elif selected_provider == "openrouter":
+            elif selected_provider_key == "openrouter":
                 model_options = ["openai/gpt-4", "anthropic/claude-3-opus", "google/gemini-pro", "meta-llama/llama-3-70b"]
-            elif selected_provider == "deepseek":
+            elif selected_provider_key == "deepseek":
                 model_options = ["deepseek-chat", "deepseek-coder", "deepseek-llm-67b"]
+            elif selected_provider_key == "github_gpt4_mini":
+                model_options = ["gpt-4.1-mini"]
+            elif selected_provider_key == "github_deepseek":
+                model_options = ["deepseek-v3-0324"]
+            elif selected_provider_key == "github_llama":
+                model_options = ["llama-4-scout-17b-16e"]
+            elif selected_provider_key == "puter":
+                model_options = ["gpt-3.5-turbo", "gpt-4"]
             
             selected_model = st.selectbox("Model", model_options, label_visibility="collapsed")
             st.session_state.current_model = selected_model
@@ -212,7 +260,7 @@ with main_container:
         st.markdown("<hr/>", unsafe_allow_html=True)
         
         # Settings
-        st.markdown("<h3>Settings</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 class='section-header'>Settings</h3>", unsafe_allow_html=True)
         
         # Temperature
         temperature = st.slider("Temperature", 0.0, 1.0, st.session_state.temperature, 0.1)
@@ -223,28 +271,28 @@ with main_container:
         st.session_state.max_tokens = max_tokens
         
         # File upload toggle
-        if st.button("Toggle File Upload"):
+        if st.button("Toggle File Upload", use_container_width=True, type="primary"):
             st.session_state.show_file_upload = not st.session_state.show_file_upload
         
         # Credit display
         st.markdown("<hr/>", unsafe_allow_html=True)
-        st.markdown("<h3>API Credits</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 class='section-header'>API Credits</h3>", unsafe_allow_html=True)
         st.markdown(create_credit_display(st.session_state.credits), unsafe_allow_html=True)
         
         # Advanced options
         st.markdown("<hr/>", unsafe_allow_html=True)
-        if st.button("Advanced Options"):
+        if st.button("Advanced Options", use_container_width=True, type="secondary"):
             st.session_state.show_advanced = not st.session_state.show_advanced
         
         if st.session_state.show_advanced:
-            st.markdown("<h3>Advanced Options</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 class='section-header'>Advanced Options</h3>", unsafe_allow_html=True)
             
             # API Keys
-            if st.button("API Keys"):
+            if st.button("API Keys", use_container_width=True, type="secondary"):
                 st.session_state.show_api_keys = not st.session_state.show_api_keys
             
             if st.session_state.show_api_keys:
-                st.markdown("<h4>API Keys</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 class='subsection-header'>API Keys</h4>", unsafe_allow_html=True)
                 
                 # Only show API key inputs in local mode, not on HuggingFace Spaces
                 if not backend["secret_manager"].is_huggingface_space:
@@ -276,6 +324,10 @@ with main_container:
                                                 value=backend["secret_manager"].get_secret("DEEPSEEK_API_KEY"),
                                                 type="password")
                     
+                    github_pat_key = st.text_input("GitHub PAT Token", 
+                                                 value=backend["secret_manager"].get_secret("GITHUB_PAT_TOKEN"),
+                                                 type="password")
+                    
                     # Update API keys if changed
                     if openai_key != backend["secret_manager"].get_secret("OPENAI_API_KEY"):
                         backend["secret_manager"].set_secret("OPENAI_API_KEY", openai_key)
@@ -305,8 +357,14 @@ with main_container:
                         backend["secret_manager"].set_secret("DEEPSEEK_API_KEY", deepseek_key)
                         backend["clients"]["deepseek"].api_key = deepseek_key
                     
+                    if github_pat_key != backend["secret_manager"].get_secret("GITHUB_PAT_TOKEN"):
+                        backend["secret_manager"].set_secret("GITHUB_PAT_TOKEN", github_pat_key)
+                        backend["clients"]["github_gpt4_mini"].api_key = github_pat_key
+                        backend["clients"]["github_deepseek"].api_key = github_pat_key
+                        backend["clients"]["github_llama"].api_key = github_pat_key
+                    
                     # Save API keys to secrets.toml
-                    if st.button("Save API Keys"):
+                    if st.button("Save API Keys", type="primary"):
                         if backend["secret_manager"].create_secrets_toml(os.path.dirname(os.path.dirname(__file__))):
                             st.success("API keys saved successfully!")
                         else:
@@ -315,11 +373,11 @@ with main_container:
                     st.info("API keys are managed through HuggingFace Spaces secrets. Please configure them in the Space settings.")
             
             # Model Optimization
-            if st.button("Model Optimization"):
+            if st.button("Model Optimization", use_container_width=True, type="secondary"):
                 st.session_state.show_optimization = not st.session_state.show_optimization
             
             if st.session_state.show_advanced and st.session_state.get("show_optimization", False):
-                st.markdown("<h4>Model Optimization</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 class='subsection-header'>Model Optimization</h4>", unsafe_allow_html=True)
                 
                 optimization_priority = st.radio(
                     "Optimization Priority",
@@ -329,7 +387,7 @@ with main_container:
                 
                 st.session_state.optimization_priority = optimization_priority.lower()
                 
-                if st.button("Recommend Model"):
+                if st.button("Recommend Model", type="primary"):
                     # Get the last user message if available
                     last_user_message = ""
                     for msg in reversed(st.session_state.messages):
@@ -343,65 +401,15 @@ with main_container:
                             priority=st.session_state.optimization_priority
                         )
                         
-                        if recommendation["model"]:
-                            st.success(f"Recommended model: {recommendation['model']}")
-                            st.json(recommendation)
-                        else:
-                            st.warning(f"No recommendation available: {recommendation['reason']}")
+                        st.success(f"Recommended model: {recommendation['provider']}/{recommendation['model']}")
                     else:
-                        st.warning("No user messages available for recommendation.")
-            
-            # Feedback
-            if st.button("Feedback"):
-                st.session_state.show_feedback = not st.session_state.show_feedback
-            
-            if st.session_state.show_advanced and st.session_state.show_feedback:
-                st.markdown("<h4>Feedback</h4>", unsafe_allow_html=True)
-                
-                # Get the last assistant message if available
-                last_assistant_message = ""
-                last_user_message = ""
-                last_model = ""
-                
-                for i in range(len(st.session_state.messages) - 1, -1, -1):
-                    msg = st.session_state.messages[i]
-                    if msg["role"] == "assistant" and not last_assistant_message:
-                        last_assistant_message = msg["content"]
-                        last_model = msg.get("model", "")
-                    elif msg["role"] == "user" and not last_user_message:
-                        last_user_message = msg["content"]
-                    
-                    if last_assistant_message and last_user_message:
-                        break
-                
-                if last_assistant_message and last_user_message:
-                    st.markdown(f"**Last User Message:**\n{last_user_message}")
-                    st.markdown(f"**Last Assistant Message ({last_model}):**\n{last_assistant_message}")
-                    
-                    rating = st.slider("Rate Response (1-5)", 1, 5, 3)
-                    feedback_text = st.text_area("Additional Feedback")
-                    
-                    if st.button("Submit Feedback"):
-                        feedback_result = backend["feedback_manager"].add_feedback(
-                            user_message=last_user_message,
-                            assistant_message=last_assistant_message,
-                            model=last_model,
-                            rating=rating,
-                            feedback=feedback_text
-                        )
-                        
-                        if feedback_result:
-                            st.success("Feedback submitted successfully!")
-                        else:
-                            st.error("Failed to submit feedback.")
-                else:
-                    st.warning("No messages available for feedback.")
+                        st.warning("Please send a message first to get a recommendation.")
     
     # Main chat area (right column)
     with col2:
         # File upload area
         if st.session_state.show_file_upload:
-            st.markdown("<h3>File Upload</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 class='section-header'>File Upload</h3>", unsafe_allow_html=True)
             uploaded_files = st.file_uploader("Upload Files", accept_multiple_files=True, label_visibility="collapsed")
             
             if uploaded_files:
@@ -419,21 +427,21 @@ with main_container:
             
             # Display uploaded files
             if st.session_state.uploaded_files:
-                st.markdown("<h4>Uploaded Files</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 class='subsection-header'>Uploaded Files</h4>", unsafe_allow_html=True)
                 for file_path in st.session_state.uploaded_files:
                     file_name = os.path.basename(file_path)
                     col1, col2 = st.columns([3, 1])
                     with col1:
                         st.markdown(f"**{file_name}**")
                     with col2:
-                        if st.button(f"Remove {file_name}", key=f"remove_{file_name}"):
+                        if st.button(f"Remove {file_name}", key=f"remove_{file_name}", type="secondary"):
                             st.session_state.uploaded_files.remove(file_path)
                             if os.path.exists(file_path):
                                 os.remove(file_path)
-                            st.experimental_rerun()
+                            st.rerun()
         
         # Chat messages
-        st.markdown("<h3>Chat</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 class='section-header'>Chat</h3>", unsafe_allow_html=True)
         
         # Display chat messages
         chat_container = st.container()
@@ -451,7 +459,7 @@ with main_container:
         col1, col2 = st.columns([4, 1])
         
         with col2:
-            if st.button("Send", use_container_width=True):
+            if st.button("Send", use_container_width=True, type="primary"):
                 if user_input:
                     # Add user message to chat
                     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -493,4 +501,80 @@ with main_container:
                     
                     # Clear thinking indicator and rerun to update UI
                     thinking_placeholder.empty()
-                    st.experimental_rerun()
+                    st.rerun()
+
+# Add custom CSS for improved aesthetics
+st.markdown("""
+<style>
+.app-title {
+    color: #4CAF50;
+    font-size: 2.2em;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.section-header {
+    color: #2196F3;
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #2196F3;
+    padding-bottom: 5px;
+}
+
+.subsection-header {
+    color: #9C27B0;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+/* Improve button styling */
+.stButton > button {
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Improve chat message styling */
+.chat-message {
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.user-message {
+    background-color: #E3F2FD;
+    border-left: 5px solid #2196F3;
+}
+
+.assistant-message {
+    background-color: #F1F8E9;
+    border-left: 5px solid #4CAF50;
+}
+
+/* Improve dropdown styling */
+.stSelectbox > div > div {
+    border-radius: 8px;
+}
+
+/* Improve slider styling */
+.stSlider > div > div > div {
+    height: 6px;
+}
+
+.stSlider > div > div > div > div {
+    height: 20px;
+    width: 20px;
+}
+</style>
+""", unsafe_allow_html=True)
