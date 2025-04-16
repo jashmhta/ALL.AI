@@ -28,7 +28,9 @@ class SecretManager:
             "llama": "",
             "huggingface": "",
             "openrouter": "",
-            "deepseek": ""
+            "deepseek": "",
+            "github_pat_token": "",
+            "puter": "free"  # Puter is always available as it's free
         }
     
     def _load_secrets(self) -> Dict[str, str]:
@@ -42,7 +44,7 @@ class SecretManager:
         
         # Try loading from Streamlit secrets
         try:
-            for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek"]:
+            for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token", "puter"]:
                 if hasattr(st, "secrets") and provider in st.secrets:
                     secrets[provider] = st.secrets[provider]
         except:
@@ -61,17 +63,20 @@ class SecretManager:
                     config = {}
                 
                 # Extract API keys
-                for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek"]:
+                for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token", "puter"]:
                     if provider in config:
                         secrets[provider] = config[provider]
             except Exception as e:
                 print(f"Error loading config file: {str(e)}")
         
         # Try loading from environment variables
-        for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek"]:
+        for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token"]:
             env_var = f"{provider.upper()}_API_KEY"
             if env_var in os.environ:
                 secrets[provider] = os.environ[env_var]
+        
+        # Puter is always available as it's free
+        secrets["puter"] = "free"
         
         return secrets
     
@@ -103,8 +108,8 @@ class SecretManager:
             Secret value
         """
         # Handle API keys with provider name in key
-        for provider in ["OPENAI", "CLAUDE", "GEMINI", "LLAMA", "HUGGINGFACE", "OPENROUTER", "DEEPSEEK"]:
-            if key == f"{provider}_API_KEY":
+        for provider in ["OPENAI", "CLAUDE", "GEMINI", "LLAMA", "HUGGINGFACE", "OPENROUTER", "DEEPSEEK", "GITHUB_PAT_TOKEN"]:
+            if key == f"{provider}_API_KEY" or key == provider:
                 return self.get_api_key(provider.lower())
         
         # Try to get from Streamlit secrets
@@ -144,8 +149,8 @@ class SecretManager:
             value: Secret value
         """
         # Handle API keys with provider name in key
-        for provider in ["OPENAI", "CLAUDE", "GEMINI", "LLAMA", "HUGGINGFACE", "OPENROUTER", "DEEPSEEK"]:
-            if key == f"{provider}_API_KEY":
+        for provider in ["OPENAI", "CLAUDE", "GEMINI", "LLAMA", "HUGGINGFACE", "OPENROUTER", "DEEPSEEK", "GITHUB_PAT_TOKEN"]:
+            if key == f"{provider}_API_KEY" or key == provider:
                 self.set_api_key(provider.lower(), value)
                 return
         
@@ -186,6 +191,10 @@ class SecretManager:
         Returns:
             True if API key exists, False otherwise
         """
+        # Puter is always available as it's free
+        if provider == "puter":
+            return True
+            
         return provider in self.secrets and bool(self.secrets[provider])
     
     def get_all_providers(self) -> List[str]:
@@ -213,6 +222,9 @@ class SecretManager:
         Returns:
             Dictionary of provider to availability status
         """
+        # Check if GitHub PAT token is available for GitHub Marketplace Models
+        github_pat_available = self.has_api_key("github_pat_token")
+        
         return {
             "openai": self.has_api_key("openai"),
             "claude": self.has_api_key("claude"),
@@ -220,7 +232,12 @@ class SecretManager:
             "llama": self.has_api_key("llama"),
             "huggingface": self.has_api_key("huggingface"),
             "openrouter": self.has_api_key("openrouter"),
-            "deepseek": self.has_api_key("deepseek")
+            "deepseek": self.has_api_key("deepseek"),
+            "github_pat_token": github_pat_available,  # For GitHub Marketplace Models
+            "github_gpt4_mini": github_pat_available,  # GitHub GPT-4.1-mini
+            "github_deepseek": github_pat_available,   # GitHub DeepSeek-V3
+            "github_llama": github_pat_available,      # GitHub Llama 4 Scout
+            "puter": True  # Puter is always available as it's free
         }
     
     def clear_api_key(self, provider: str) -> None:
@@ -242,7 +259,8 @@ class SecretManager:
         Clear all API keys.
         """
         for provider in self.secrets:
-            self.secrets[provider] = ""
+            if provider != "puter":  # Keep puter as it's always free
+                self.secrets[provider] = ""
         
         # Save to config file if provided
         if self.config_path:
@@ -257,13 +275,17 @@ class SecretManager:
         """
         results = {}
         
-        for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek"]:
+        for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token"]:
             env_var = f"{provider.upper()}_API_KEY"
             if env_var in os.environ and os.environ[env_var]:
                 self.secrets[provider] = os.environ[env_var]
                 results[provider] = True
             else:
                 results[provider] = False
+        
+        # Puter is always available
+        results["puter"] = True
+        self.secrets["puter"] = "free"
         
         # Save to config file if provided
         if self.config_path:
@@ -291,7 +313,7 @@ class SecretManager:
             
             # Prepare secrets data
             secrets_data = {}
-            for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek"]:
+            for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token"]:
                 if self.has_api_key(provider):
                     secrets_data[f"{provider}_api_key"] = self.get_api_key(provider)
             
