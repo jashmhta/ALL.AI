@@ -9,9 +9,8 @@
 /* Sidebar styling with enhanced golden accent */
 .stSidebar {
     background-color: #1A1A1A;
-    border-right: 3px solid #D4AF37; /* Enhanced golden border between sidebar and main content */
-    box-shadow: 0 0 15px rgba(212, 175, 55, 0.4); /* Enhanced golden glow */
-    position: relative; /* For absolute positioning of pseudo-elements */
+    border-right: 3px solid #D4AF37; /* Increased border width from 2px to 3px */
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.4); /* Increased opacity and spread */
 }
 
 .stSidebar .sidebar-content {
@@ -25,7 +24,7 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 4px; /* Increased from 3px to 4px */
     background: linear-gradient(90deg, #D4AF37, #F5D76E, #D4AF37);
 }
 
@@ -34,12 +33,10 @@
     content: "";
     position: absolute;
     top: 0;
-    bottom: 0;
     right: 0;
-    width: 3px;
-    background: linear-gradient(to bottom, #D4AF37, #F5D76E, #D4AF37);
-    box-shadow: 0 0 10px rgba(212, 175, 55, 0.6);
-    z-index: 1000;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(180deg, #D4AF37, #F5D76E, #D4AF37);
 }
 
 /* Input fields, text areas, and selectboxes */
@@ -89,14 +86,14 @@ header {
     border-bottom: 1px solid #333333;
 }
 
-/* Chat container with golden accents */
+/* Chat container with enhanced golden accents */
 .chat-container {
     background-color: #121212;
     border-radius: 10px;
     padding: 1rem;
     margin-bottom: 1rem;
-    border-left: 2px solid #D4AF37;
-    box-shadow: -3px 0 10px rgba(212, 175, 55, 0.2);
+    border-left: 3px solid #D4AF37; /* Increased from 2px to 3px */
+    box-shadow: -3px 0 15px rgba(212, 175, 55, 0.3); /* Increased spread and opacity */
 }
 
 /* Message bubbles */
@@ -121,6 +118,19 @@ header {
     max-width: 80%;
     align-self: flex-start;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border-left: 2px solid #D4AF37; /* Added golden accent to assistant messages */
+}
+
+/* Model info with enhanced styling */
+.model-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    background-color: rgba(212, 175, 55, 0.1);
+    border-radius: 5px;
+    width: fit-content;
 }
 
 /* Model selection with golden accents */
@@ -146,40 +156,89 @@ header {
 
 .model-option:hover {
     background-color: #3D3D3D;
+    box-shadow: 0 0 8px rgba(212, 175, 55, 0.3); /* Added golden glow on hover */
 }
 
 .model-option.selected {
     background-color: #444444;
     border: 1px solid #D4AF37;
-    box-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+    box-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
 }
 
 .model-icon {
     width: 24px;
     height: 24px;
     border-radius: 50%;
+    background-color: #1A1A1A;
+    padding: 2px;
+    border: 1px solid #D4AF37;
 }
 
-/* Code blocks with golden accents */
-pre {
+.model-icon-placeholder {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #D4AF37;
+    color: #121212;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* Code blocks with enhanced styling */
+.code-block-container {
     background-color: #1A1A1A;
     border-radius: 8px;
+    margin: 1rem 0;
+    overflow: hidden;
+    border-left: 3px solid #D4AF37; /* Golden accent */
+    box-shadow: -2px 0 10px rgba(212, 175, 55, 0.2); /* Subtle shadow */
+}
+
+.code-header {
+    background-color: #2A2A2A;
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333333;
+}
+
+.code-language {
+    color: #D4AF37;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+pre {
+    background-color: #1A1A1A;
+    border-radius: 0 0 8px 8px;
     padding: 1rem;
     overflow-x: auto;
-    margin: 1rem 0;
+    margin: 0;
     position: relative;
-    border-left: 2px solid #D4AF37;
 }
 
 code {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     color: #E0E0E0;
+    display: block;
+    counter-reset: line;
+    padding-left: 2rem;
+}
+
+.line-number {
+    position: absolute;
+    left: 0;
+    color: #666;
+    text-align: right;
+    width: 1.5rem;
+    user-select: none;
 }
 
 .copy-button {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
     background-color: #333333;
     color: #E0E0E0;
     border: none;
@@ -192,6 +251,7 @@ code {
 
 .copy-button:hover {
     background-color: #444444;
+    box-shadow: 0 0 5px rgba(212, 175, 55, 0.3); /* Added golden glow on hover */
 }
 
 /* Expandable/collapsible sections */
@@ -209,6 +269,7 @@ code {
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
+    border-left: 2px solid #D4AF37; /* Added golden accent */
 }
 
 .expandable-content {
@@ -223,13 +284,13 @@ code {
     padding: 1rem;
 }
 
-/* Thinking indicator */
+/* Thinking indicator with golden accents */
 .thinking-indicator {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     margin: 1rem 0;
-    color: #AAAAAA;
+    color: #D4AF37; /* Changed to gold color */
 }
 
 .thinking-dots {
@@ -240,7 +301,7 @@ code {
 .thinking-dot {
     width: 8px;
     height: 8px;
-    background-color: #AAAAAA;
+    background-color: #D4AF37; /* Changed to gold color */
     border-radius: 50%;
     animation: pulse 1.5s infinite;
 }
@@ -251,6 +312,60 @@ code {
 
 .thinking-dot:nth-child(3) {
     animation-delay: 0.4s;
+}
+
+/* Loading indicator with golden accents */
+.loading-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.loading-spinner {
+    position: relative;
+    width: 50px;
+    height: 50px;
+}
+
+.spinner-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 3px solid transparent;
+    border-top-color: #D4AF37;
+    border-radius: 50%;
+    animation: spin 1.2s linear infinite;
+}
+
+.spinner-ring:before {
+    content: "";
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    bottom: 5px;
+    border: 3px solid transparent;
+    border-top-color: #F5D76E;
+    border-radius: 50%;
+    animation: spin 1.8s linear infinite;
+}
+
+.loading-message {
+    color: #D4AF37;
+    font-size: 1.1rem;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(212, 175, 55, 0.3);
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes pulse {
@@ -324,12 +439,13 @@ code {
     color: #D16969;
 }
 
-/* Credit tracking display */
+/* Credit tracking display with golden accents */
 .credit-display {
     background-color: #1E1E1E;
     border-radius: 8px;
     padding: 0.8rem 1rem;
     margin: 1rem 0;
+    border-left: 2px solid #D4AF37; /* Added golden accent */
 }
 
 .credit-item {
@@ -352,9 +468,10 @@ code {
 
 .credit-amount {
     font-weight: bold;
+    color: #D4AF37; /* Changed to gold color */
 }
 
-/* File upload area */
+/* File upload area with golden accents */
 .file-upload-area {
     border: 2px dashed #444444;
     border-radius: 8px;
@@ -365,8 +482,24 @@ code {
 }
 
 .file-upload-area:hover {
-    border-color: #666666;
-    background-color: rgba(255, 255, 255, 0.05);
+    border-color: #D4AF37; /* Changed to gold color on hover */
+    background-color: rgba(212, 175, 55, 0.05); /* Subtle gold background on hover */
+}
+
+.upload-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: #D4AF37;
+}
+
+.upload-text {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.upload-subtext {
+    font-size: 0.8rem;
+    color: #999;
 }
 
 .file-list {
@@ -381,6 +514,7 @@ code {
     border-radius: 8px;
     padding: 0.5rem 1rem;
     margin: 0.5rem 0;
+    border-left: 2px solid #D4AF37; /* Added golden accent */
 }
 
 .file-remove {
@@ -388,13 +522,46 @@ code {
     cursor: pointer;
 }
 
-/* Mobile responsiveness */
+/* Message preview styling */
+.message-preview {
+    color: #CCC;
+    font-style: italic;
+    margin-top: 0.3rem;
+}
+
+/* Mobile responsiveness improvements */
 @media (max-width: 768px) {
     .user-message, .assistant-message {
-        max-width: 90%;
+        max-width: 95%; /* Increased from 90% for better space usage */
     }
     
     .model-selection {
         flex-direction: column;
     }
+    
+    /* Improved touch targets for mobile */
+    .model-option, .stButton > button, .file-item {
+        padding: 0.7rem 1rem; /* Increased padding for better touch targets */
+    }
+    
+    /* Adjust sidebar for mobile */
+    .stSidebar {
+        width: 100% !important; /* Full width sidebar on mobile */
+    }
+    
+    .code-block-container {
+        max-width: 95vw;
+        overflow-x: auto;
+    }
+}
+
+/* Animation for transitions */
+.stApp, .stSidebar, .chat-container, .user-message, .assistant-message {
+    transition: all 0.3s ease;
+}
+
+/* Mobile view specific classes */
+.mobile-view {
+    width: 100% !important;
+    padding: 0.5rem !important;
 }

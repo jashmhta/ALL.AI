@@ -24,7 +24,11 @@ def get_model_icon_html(model_name):
         "huggingface": "huggingface_icon.svg",
         "openrouter": "openrouter_icon.svg",
         "deepseek": "deepseek_icon.svg",
-        "mixture": "mixture_icon.svg"
+        "mixture": "mixture_icon.svg",
+        "github_gpt4_mini": "openai_icon.svg",
+        "github_deepseek": "deepseek_icon.svg",
+        "github_llama": "llama_icon.svg",
+        "puter": "placeholder.svg"
     }
     
     # Default icon if model-specific icon not found
@@ -37,8 +41,14 @@ def get_model_icon_html(model_name):
     
     # Read and encode the image
     if icon_path.endswith('.svg'):
-        encoded_image = svg_to_png(icon_path)
-        img_format = 'png'
+        try:
+            encoded_image = svg_to_png(icon_path)
+            img_format = 'png'
+        except Exception as e:
+            # Fallback to direct SVG if conversion fails
+            with open(icon_path, "rb") as f:
+                encoded_image = base64.b64encode(f.read()).decode()
+            img_format = 'svg+xml'
     else:
         with open(icon_path, "rb") as f:
             encoded_image = base64.b64encode(f.read()).decode()
@@ -63,12 +73,54 @@ def create_expandable_section(header, content, expanded=False):
 
 # Function to create a code block with syntax highlighting and copy button
 def create_code_block(code, language="python"):
+    # Escape HTML characters in code
+    code = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    
+    # Add syntax highlighting classes based on language
+    highlighted_code = highlight_syntax(code, language)
+    
     return f"""
-    <pre class="language-{language}">
-        <button class="copy-button" onclick="copyCode(this)">Copy</button>
-        <code class="language-{language}">{code}</code>
-    </pre>
+    <div class="code-block-container">
+        <div class="code-header">
+            <span class="code-language">{language}</span>
+            <button class="copy-button" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre class="language-{language}">
+            <code class="language-{language}">{highlighted_code}</code>
+        </pre>
+    </div>
     """
+
+# Function to add basic syntax highlighting classes
+def highlight_syntax(code, language):
+    if language == "python":
+        # Very basic Python syntax highlighting
+        keywords = ["def", "class", "import", "from", "return", "if", "else", "elif", "for", "while", "try", "except", "with", "as", "in", "not", "and", "or", "True", "False", "None"]
+        for keyword in keywords:
+            # Only replace whole words, not parts of words
+            code = code.replace(f" {keyword} ", f" <span class='token keyword'>{keyword}</span> ")
+            code = code.replace(f"\n{keyword} ", f"\n<span class='token keyword'>{keyword}</span> ")
+            if code.startswith(f"{keyword} "):
+                code = f"<span class='token keyword'>{keyword}</span> " + code[len(keyword)+1:]
+        
+        # String highlighting (very basic)
+        code = code.replace('\"\"\"', '<span class="token string">\"\"\"</span>')
+        code = code.replace('\'\'\'', '<span class="token string">\'\'\'</span>')
+        
+        # Function calls
+        import re
+        code = re.sub(r'(\w+)(\()', r'<span class="token function">\1</span>\2', code)
+        
+    elif language == "javascript":
+        # Very basic JavaScript syntax highlighting
+        keywords = ["function", "const", "let", "var", "return", "if", "else", "for", "while", "try", "catch", "class", "new", "this", "true", "false", "null", "undefined"]
+        for keyword in keywords:
+            code = code.replace(f" {keyword} ", f" <span class='token keyword'>{keyword}</span> ")
+            code = code.replace(f"\n{keyword} ", f"\n<span class='token keyword'>{keyword}</span> ")
+            if code.startswith(f"{keyword} "):
+                code = f"<span class='token keyword'>{keyword}</span> " + code[len(keyword)+1:]
+    
+    return code
 
 # Function to create the thinking indicator
 def create_thinking_indicator():
@@ -80,6 +132,17 @@ def create_thinking_indicator():
             <div class="thinking-dot"></div>
             <div class="thinking-dot"></div>
         </div>
+    </div>
+    """
+
+# Function to create the loading indicator
+def create_loading_indicator(message="Loading..."):
+    return f"""
+    <div class="loading-indicator">
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+        </div>
+        <div class="loading-message">{message}</div>
     </div>
     """
 
@@ -126,7 +189,7 @@ def inject_javascript():
     }
     
     function copyCode(button) {
-        const codeElement = button.nextElementSibling;
+        const codeElement = button.closest('.code-block-container').querySelector('code');
         const textArea = document.createElement('textarea');
         textArea.value = codeElement.textContent.trim();
         document.body.appendChild(textArea);
@@ -156,8 +219,24 @@ def inject_javascript():
         });
     }
     
+    // Syntax highlighting for code blocks
+    function highlightSyntax() {
+        document.querySelectorAll('pre code').forEach((block) => {
+            // Add line numbers
+            const lines = block.innerHTML.split('\\n');
+            let numberedLines = '';
+            lines.forEach((line, index) => {
+                numberedLines += `<span class="line-number">${index + 1}</span>${line}\\n`;
+            });
+            block.innerHTML = numberedLines;
+        });
+    }
+    
     // Run on load and resize
-    window.addEventListener('load', adjustForMobile);
+    window.addEventListener('load', function() {
+        adjustForMobile();
+        highlightSyntax();
+    });
     window.addEventListener('resize', adjustForMobile);
     </script>
     """
@@ -185,6 +264,18 @@ def create_model_selection(models, selected_models=None):
 def create_chat_message(content, role="assistant", model=None, expandable=True):
     role_class = "user-message" if role == "user" else "assistant-message"
     model_info = f'<div class="model-info">{get_model_icon_html(model)} {model}</div>' if model else ''
+    
+    # Process code blocks in content
+    import re
+    code_pattern = r'```(\w+)?\n(.*?)\n```'
+    
+    def replace_code_block(match):
+        lang = match.group(1) or 'text'
+        code = match.group(2)
+        return create_code_block(code, lang)
+    
+    # Replace code blocks with syntax highlighted versions
+    content = re.sub(code_pattern, replace_code_block, content, flags=re.DOTALL)
     
     if expandable and role == "assistant":
         return create_expandable_section(
