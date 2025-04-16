@@ -9,12 +9,13 @@ class GitHubModelsClient:
     Supports models like GPT-4.1-mini, DeepSeek-V3-0324, and Llama 4 Scout.
     """
     
-    def __init__(self, pat_token: Optional[str] = None):
+    def __init__(self, pat_token: Optional[str] = None, model: Optional[str] = None):
         """
         Initialize the GitHub Models client.
         
         Args:
             pat_token: GitHub Personal Access Token
+            model: Default model to use for this client instance
         """
         self.pat_token = pat_token or os.environ.get("GITHUB_PAT_TOKEN", "")
         self.base_url = "https://api.github.com/models"
@@ -31,14 +32,15 @@ class GitHubModelsClient:
                 "max_tokens": 4096,
                 "supports_vision": False
             },
-            "llama-4-scout-17b": {
+            "llama-4-scout-17b-16e": {
                 "provider": "meta",
                 "model_id": "llama-4-scout-17b-16e-instruct",
                 "max_tokens": 4096,
                 "supports_vision": False
             }
         }
-        self.default_model = "gpt-4.1-mini"
+        # Set the default model, either from parameter or fallback to gpt-4.1-mini
+        self.default_model = model if model and model in self.available_models else "gpt-4.1-mini"
     
     def query(self, 
              prompt: str, 
