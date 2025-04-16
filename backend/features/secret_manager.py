@@ -1,327 +1,332 @@
 import os
-import json
 import toml
 import streamlit as st
-from typing import Dict, Any, Optional, List
 
 class SecretManager:
     """
-    Manages API keys and secrets for various AI providers.
+    Manages API keys and secrets for the Multi-AI application.
+    Provides secure access to credentials across different environments.
     """
     
-    def __init__(self, config_path: Optional[str] = None):
-        """
-        Initialize the secret manager.
-        
-        Args:
-            config_path: Optional path to config file
-        """
-        self.config_path = config_path
-        self.secrets = self._load_secrets()
-        self.is_huggingface_space = "SPACE_ID" in os.environ
-        
-        # Default API keys (for development/testing only)
-        self.default_keys = {
-            "openai": "",
-            "claude": "",
-            "gemini": "",
-            "llama": "",
-            "huggingface": "",
-            "openrouter": "",
-            "deepseek": "",
-            "github_pat_token": "",
-            "puter": "free"  # Puter is always available as it's free
-        }
+    def __init__(self):
+        """Initialize the secret manager."""
+        self.secrets = {}
+        self.is_huggingface_space = self._check_if_huggingface_space()
+        self.load_secrets()
     
-    def _load_secrets(self) -> Dict[str, str]:
+    def _check_if_huggingface_space(self) -> bool:
         """
-        Load secrets from various sources.
+        Check if the application is running on HuggingFace Spaces.
         
         Returns:
-            Dictionary of provider to API key
+            True if running on HuggingFace Spaces, False otherwise
         """
-        secrets = {}
-        
-        # Try loading from Streamlit secrets
+        return os.environ.get("SPACE_ID") is not None
+    
+    def load_secrets(self) -> None:
+        """Load secrets from the appropriate source based on the environment."""
+        if self.is_huggingface_space:
+            self._load_secrets_from_huggingface()
+        else:
+            self._load_secrets_from_file()
+    
+    def _load_secrets_from_huggingface(self) -> None:
+        """Load secrets from HuggingFace Spaces environment variables."""
+        # HuggingFace Spaces automatically loads secrets.toml into st.secrets
         try:
-            for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token", "puter"]:
-                if hasattr(st, "secrets") and provider in st.secrets:
-                    secrets[provider] = st.secrets[provider]
-        except:
-            pass
-        
-        # Try loading from config file
-        if self.config_path and os.path.exists(self.config_path):
-            try:
-                if self.config_path.endswith(".json"):
-                    with open(self.config_path, 'r') as f:
-                        config = json.load(f)
-                elif self.config_path.endswith(".toml"):
-                    with open(self.config_path, 'r') as f:
-                        config = toml.load(f)
-                else:
-                    config = {}
-                
-                # Extract API keys
-                for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token", "puter"]:
-                    if provider in config:
-                        secrets[provider] = config[provider]
-            except Exception as e:
-                print(f"Error loading config file: {str(e)}")
-        
-        # Try loading from environment variables
-        for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token"]:
-            env_var = f"{provider.upper()}_API_KEY"
-            if env_var in os.environ:
-                secrets[provider] = os.environ[env_var]
-        
-        # Puter is always available as it's free
-        secrets["puter"] = "free"
-        
-        return secrets
-    
-    def get_api_key(self, provider: str) -> str:
-        """
-        Get API key for a provider.
-        
-        Args:
-            provider: Provider name
+            # OpenAI
+            self.secrets["OPENAI_API_KEY"] = st.secrets.get("OPENAI_API_KEY", "")
             
-        Returns:
-            API key
-        """
-        # Check if key exists in secrets
-        if provider in self.secrets and self.secrets[provider]:
-            return self.secrets[provider]
-        
-        # Return default key (empty string if not set)
-        return self.default_keys.get(provider, "")
+            # Claude/Anthropic
+            self.secrets["CLAUDE_API_KEY"] = st.secrets.get("CLAUDE_API_KEY", "")
+            
+            # Gemini
+            self.secrets["GEMINI_API_KEY"] = st.secrets.get("GEMINI_API_KEY", "")
+            
+            # Llama
+            self.secrets["LLAMA_API_KEY"] = st.secrets.get("LLAMA_API_KEY", "")
+            
+            # HuggingFace
+            self.secrets["HUGGINGFACE_API_KEY"] = st.secrets.get("HUGGINGFACE_API_KEY", "")
+            
+            # OpenRouter
+            self.secrets["OPENROUTER_API_KEY"] = st.secrets.get("OPENROUTER_API_KEY", "")
+            self.secrets["OPENROUTER_API_KEY_2"] = st.secrets.get("OPENROUTER_API_KEY_2", "")
+            
+            # DeepSeek
+            self.secrets["DEEPSEEK_API_KEY"] = st.secrets.get("DEEPSEEK_API_KEY", "")
+            
+            # GitHub
+            self.secrets["GITHUB_TOKEN"] = st.secrets.get("GITHUB_TOKEN", "")
+            self.secrets["GITHUB_TOKEN_ALT"] = st.secrets.get("GITHUB_TOKEN_ALT", "")
+            
+            print("Loaded secrets from HuggingFace Spaces environment")
+        except Exception as e:
+            print(f"Error loading secrets from HuggingFace Spaces: {e}")
+            # Initialize with empty values as fallback
+            self._initialize_empty_secrets()
+    
+    def _load_secrets_from_file(self) -> None:
+        """Load secrets from local secrets.toml file."""
+        try:
+            # Check for .streamlit/secrets.toml first (Streamlit standard)
+            streamlit_secrets_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".streamlit", "secrets.toml")
+            
+            # Then check for secrets.toml in the root directory
+            root_secrets_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "secrets.toml")
+            
+            # Finally check for secrets.toml in the current directory
+            local_secrets_path = os.path.join(os.path.dirname(__file__), "secrets.toml")
+            
+            # Try to load from one of the paths
+            if os.path.exists(streamlit_secrets_path):
+                secrets_dict = toml.load(streamlit_secrets_path)
+                print(f"Loaded secrets from {streamlit_secrets_path}")
+            elif os.path.exists(root_secrets_path):
+                secrets_dict = toml.load(root_secrets_path)
+                print(f"Loaded secrets from {root_secrets_path}")
+            elif os.path.exists(local_secrets_path):
+                secrets_dict = toml.load(local_secrets_path)
+                print(f"Loaded secrets from {local_secrets_path}")
+            else:
+                print("No secrets.toml file found, using environment variables")
+                self._load_secrets_from_env()
+                return
+            
+            # Extract secrets from the loaded dictionary
+            # OpenAI
+            if "openai" in secrets_dict:
+                self.secrets["OPENAI_API_KEY"] = secrets_dict["openai"].get("OPENAI_API_KEY", "")
+            else:
+                self.secrets["OPENAI_API_KEY"] = secrets_dict.get("OPENAI_API_KEY", "")
+            
+            # Claude/Anthropic
+            if "claude" in secrets_dict:
+                self.secrets["CLAUDE_API_KEY"] = secrets_dict["claude"].get("CLAUDE_API_KEY", "")
+            else:
+                self.secrets["CLAUDE_API_KEY"] = secrets_dict.get("CLAUDE_API_KEY", "")
+            
+            # Gemini
+            if "gemini" in secrets_dict:
+                self.secrets["GEMINI_API_KEY"] = secrets_dict["gemini"].get("GEMINI_API_KEY", "")
+            else:
+                self.secrets["GEMINI_API_KEY"] = secrets_dict.get("GEMINI_API_KEY", "")
+            
+            # Llama
+            if "llama" in secrets_dict:
+                self.secrets["LLAMA_API_KEY"] = secrets_dict["llama"].get("LLAMA_API_KEY", "")
+            else:
+                self.secrets["LLAMA_API_KEY"] = secrets_dict.get("LLAMA_API_KEY", "")
+            
+            # HuggingFace
+            if "huggingface" in secrets_dict:
+                self.secrets["HUGGINGFACE_API_KEY"] = secrets_dict["huggingface"].get("HUGGINGFACE_API_KEY", "")
+            else:
+                self.secrets["HUGGINGFACE_API_KEY"] = secrets_dict.get("HUGGINGFACE_API_KEY", "")
+            
+            # OpenRouter
+            if "openrouter" in secrets_dict:
+                self.secrets["OPENROUTER_API_KEY"] = secrets_dict["openrouter"].get("OPENROUTER_API_KEY", "")
+                self.secrets["OPENROUTER_API_KEY_2"] = secrets_dict["openrouter"].get("OPENROUTER_API_KEY_2", "")
+            else:
+                self.secrets["OPENROUTER_API_KEY"] = secrets_dict.get("OPENROUTER_API_KEY", "")
+                self.secrets["OPENROUTER_API_KEY_2"] = secrets_dict.get("OPENROUTER_API_KEY_2", "")
+            
+            # DeepSeek
+            if "deepseek" in secrets_dict:
+                self.secrets["DEEPSEEK_API_KEY"] = secrets_dict["deepseek"].get("DEEPSEEK_API_KEY", "")
+            else:
+                self.secrets["DEEPSEEK_API_KEY"] = secrets_dict.get("DEEPSEEK_API_KEY", "")
+            
+            # GitHub
+            if "github" in secrets_dict:
+                self.secrets["GITHUB_TOKEN"] = secrets_dict["github"].get("GITHUB_TOKEN", "")
+                self.secrets["GITHUB_TOKEN_ALT"] = secrets_dict["github"].get("GITHUB_TOKEN_ALT", "")
+            else:
+                self.secrets["GITHUB_TOKEN"] = secrets_dict.get("GITHUB_TOKEN", "")
+                self.secrets["GITHUB_TOKEN_ALT"] = secrets_dict.get("GITHUB_TOKEN_ALT", "")
+            
+        except Exception as e:
+            print(f"Error loading secrets from file: {e}")
+            # Try environment variables as fallback
+            self._load_secrets_from_env()
+    
+    def _load_secrets_from_env(self) -> None:
+        """Load secrets from environment variables."""
+        try:
+            # OpenAI
+            self.secrets["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")
+            
+            # Claude/Anthropic
+            self.secrets["CLAUDE_API_KEY"] = os.environ.get("CLAUDE_API_KEY", "")
+            
+            # Gemini
+            self.secrets["GEMINI_API_KEY"] = os.environ.get("GEMINI_API_KEY", "")
+            
+            # Llama
+            self.secrets["LLAMA_API_KEY"] = os.environ.get("LLAMA_API_KEY", "")
+            
+            # HuggingFace
+            self.secrets["HUGGINGFACE_API_KEY"] = os.environ.get("HUGGINGFACE_API_KEY", "")
+            
+            # OpenRouter
+            self.secrets["OPENROUTER_API_KEY"] = os.environ.get("OPENROUTER_API_KEY", "")
+            self.secrets["OPENROUTER_API_KEY_2"] = os.environ.get("OPENROUTER_API_KEY_2", "")
+            
+            # DeepSeek
+            self.secrets["DEEPSEEK_API_KEY"] = os.environ.get("DEEPSEEK_API_KEY", "")
+            
+            # GitHub
+            self.secrets["GITHUB_TOKEN"] = os.environ.get("GITHUB_TOKEN", "")
+            self.secrets["GITHUB_TOKEN_ALT"] = os.environ.get("GITHUB_TOKEN_ALT", "")
+            
+            print("Loaded secrets from environment variables")
+        except Exception as e:
+            print(f"Error loading secrets from environment variables: {e}")
+            # Initialize with empty values as fallback
+            self._initialize_empty_secrets()
+    
+    def _initialize_empty_secrets(self) -> None:
+        """Initialize empty secrets as fallback."""
+        self.secrets = {
+            "OPENAI_API_KEY": "",
+            "CLAUDE_API_KEY": "",
+            "GEMINI_API_KEY": "",
+            "LLAMA_API_KEY": "",
+            "HUGGINGFACE_API_KEY": "",
+            "OPENROUTER_API_KEY": "",
+            "OPENROUTER_API_KEY_2": "",
+            "DEEPSEEK_API_KEY": "",
+            "GITHUB_TOKEN": "",
+            "GITHUB_TOKEN_ALT": ""
+        }
+        print("Initialized empty secrets as fallback")
     
     def get_secret(self, key: str) -> str:
         """
-        Get secret by key name.
+        Get a secret by key.
         
         Args:
-            key: Secret key name
+            key: The key of the secret to get
             
         Returns:
-            Secret value
+            The secret value, or an empty string if not found
         """
-        # Handle API keys with provider name in key
-        for provider in ["OPENAI", "CLAUDE", "GEMINI", "LLAMA", "HUGGINGFACE", "OPENROUTER", "DEEPSEEK", "GITHUB_PAT_TOKEN"]:
-            if key == f"{provider}_API_KEY" or key == provider:
-                return self.get_api_key(provider.lower())
-        
-        # Try to get from Streamlit secrets
-        if hasattr(st, "secrets") and key in st.secrets:
-            return st.secrets[key]
-        
-        # Try to get from environment variables
-        if key in os.environ:
-            return os.environ[key]
-        
-        # Return empty string if not found
-        return ""
-    
-    def set_api_key(self, provider: str, api_key: str) -> None:
-        """
-        Set API key for a provider.
-        
-        Args:
-            provider: Provider name
-            api_key: API key
-        """
-        self.secrets[provider] = api_key
-        
-        # Update default keys
-        self.default_keys[provider] = api_key
-        
-        # Save to config file if provided
-        if self.config_path:
-            self._save_secrets()
+        return self.secrets.get(key, "")
     
     def set_secret(self, key: str, value: str) -> None:
         """
-        Set secret by key name.
+        Set a secret value (only for local development).
         
         Args:
-            key: Secret key name
-            value: Secret value
+            key: The key of the secret to set
+            value: The value to set
         """
-        # Handle API keys with provider name in key
-        for provider in ["OPENAI", "CLAUDE", "GEMINI", "LLAMA", "HUGGINGFACE", "OPENROUTER", "DEEPSEEK", "GITHUB_PAT_TOKEN"]:
-            if key == f"{provider}_API_KEY" or key == provider:
-                self.set_api_key(provider.lower(), value)
-                return
-        
-        # Store in secrets dictionary
-        self.secrets[key] = value
-        
-        # Save to config file if provided
-        if self.config_path:
-            self._save_secrets()
+        if not self.is_huggingface_space:
+            self.secrets[key] = value
     
-    def _save_secrets(self) -> None:
+    def has_valid_secrets(self) -> bool:
         """
-        Save secrets to config file.
+        Check if valid secrets are available.
+        
+        Returns:
+            True if at least one valid API key is available, False otherwise
         """
-        if not self.config_path:
-            return
+        # Check if at least one API key is available
+        return any([
+            self.secrets.get("OPENAI_API_KEY", ""),
+            self.secrets.get("CLAUDE_API_KEY", ""),
+            self.secrets.get("GEMINI_API_KEY", ""),
+            self.secrets.get("LLAMA_API_KEY", ""),
+            self.secrets.get("HUGGINGFACE_API_KEY", ""),
+            self.secrets.get("OPENROUTER_API_KEY", ""),
+            self.secrets.get("DEEPSEEK_API_KEY", "")
+        ])
+    
+    def get_available_models(self) -> dict:
+        """
+        Get a dictionary of available models based on API keys.
+        
+        Returns:
+            Dict mapping model categories to availability status
+        """
+        return {
+            "openai": bool(self.secrets.get("OPENAI_API_KEY", "")),
+            "claude": bool(self.secrets.get("CLAUDE_API_KEY", "")),
+            "gemini": bool(self.secrets.get("GEMINI_API_KEY", "")),
+            "llama": bool(self.secrets.get("LLAMA_API_KEY", "")),
+            "huggingface": bool(self.secrets.get("HUGGINGFACE_API_KEY", "")),
+            "openrouter": bool(self.secrets.get("OPENROUTER_API_KEY", "")),
+            "deepseek": bool(self.secrets.get("DEEPSEEK_API_KEY", ""))
+        }
+    
+    def create_secrets_toml(self, directory: str) -> bool:
+        """
+        Create a secrets.toml file with the current secrets.
+        
+        Args:
+            directory: Directory to create the file in
+            
+        Returns:
+            True if creation was successful, False otherwise
+        """
+        if self.is_huggingface_space:
+            print("Cannot create secrets.toml in HuggingFace Spaces environment")
+            return False
         
         try:
             # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+            os.makedirs(directory, exist_ok=True)
             
-            if self.config_path.endswith(".json"):
-                with open(self.config_path, 'w') as f:
-                    json.dump(self.secrets, f, indent=2)
-            elif self.config_path.endswith(".toml"):
-                with open(self.config_path, 'w') as f:
-                    toml.dump(self.secrets, f)
-        except Exception as e:
-            print(f"Error saving secrets: {str(e)}")
-    
-    def has_api_key(self, provider: str) -> bool:
-        """
-        Check if API key exists for a provider.
-        
-        Args:
-            provider: Provider name
-            
-        Returns:
-            True if API key exists, False otherwise
-        """
-        # Puter is always available as it's free
-        if provider == "puter":
-            return True
-            
-        return provider in self.secrets and bool(self.secrets[provider])
-    
-    def get_all_providers(self) -> List[str]:
-        """
-        Get list of all providers.
-        
-        Returns:
-            List of provider names
-        """
-        return list(self.default_keys.keys())
-    
-    def get_available_providers(self) -> List[str]:
-        """
-        Get list of providers with API keys.
-        
-        Returns:
-            List of provider names with API keys
-        """
-        return [provider for provider in self.secrets if self.has_api_key(provider)]
-    
-    def get_available_models(self) -> Dict[str, bool]:
-        """
-        Get dictionary of available models based on API keys.
-        
-        Returns:
-            Dictionary of provider to availability status
-        """
-        # Check if GitHub PAT token is available for GitHub Marketplace Models
-        github_pat_available = self.has_api_key("github_pat_token")
-        
-        return {
-            "openai": self.has_api_key("openai"),
-            "claude": self.has_api_key("claude"),
-            "gemini": self.has_api_key("gemini"),
-            "llama": self.has_api_key("llama"),
-            "huggingface": self.has_api_key("huggingface"),
-            "openrouter": self.has_api_key("openrouter"),
-            "deepseek": self.has_api_key("deepseek"),
-            "github_pat_token": github_pat_available,  # For GitHub Marketplace Models
-            "github_gpt4_mini": github_pat_available,  # GitHub GPT-4.1-mini
-            "github_deepseek": github_pat_available,   # GitHub DeepSeek-V3
-            "github_llama": github_pat_available,      # GitHub Llama 4 Scout
-            "puter": True  # Puter is always available as it's free
-        }
-    
-    def clear_api_key(self, provider: str) -> None:
-        """
-        Clear API key for a provider.
-        
-        Args:
-            provider: Provider name
-        """
-        if provider in self.secrets:
-            self.secrets[provider] = ""
-            
-            # Save to config file if provided
-            if self.config_path:
-                self._save_secrets()
-    
-    def clear_all_api_keys(self) -> None:
-        """
-        Clear all API keys.
-        """
-        for provider in self.secrets:
-            if provider != "puter":  # Keep puter as it's always free
-                self.secrets[provider] = ""
-        
-        # Save to config file if provided
-        if self.config_path:
-            self._save_secrets()
-    
-    def import_keys_from_env(self) -> Dict[str, bool]:
-        """
-        Import keys from environment variables.
-        
-        Returns:
-            Dictionary of provider to success status
-        """
-        results = {}
-        
-        for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token"]:
-            env_var = f"{provider.upper()}_API_KEY"
-            if env_var in os.environ and os.environ[env_var]:
-                self.secrets[provider] = os.environ[env_var]
-                results[provider] = True
-            else:
-                results[provider] = False
-        
-        # Puter is always available
-        results["puter"] = True
-        self.secrets["puter"] = "free"
-        
-        # Save to config file if provided
-        if self.config_path:
-            self._save_secrets()
-        
-        return results
-    
-    def create_secrets_toml(self, directory_path: str) -> bool:
-        """
-        Create secrets.toml file in .streamlit directory.
-        
-        Args:
-            directory_path: Directory path for .streamlit folder
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Create .streamlit directory if it doesn't exist
-            streamlit_dir = os.path.join(directory_path, ".streamlit")
-            os.makedirs(streamlit_dir, exist_ok=True)
-            
-            # Create secrets.toml file
-            secrets_path = os.path.join(streamlit_dir, "secrets.toml")
-            
-            # Prepare secrets data
-            secrets_data = {}
-            for provider in ["openai", "claude", "gemini", "llama", "huggingface", "openrouter", "deepseek", "github_pat_token"]:
-                if self.has_api_key(provider):
-                    secrets_data[f"{provider}_api_key"] = self.get_api_key(provider)
+            # Create secrets.toml content
+            content = """# API Keys for Multi-AI App
+# This file contains API keys for various AI services
+
+[openai]
+OPENAI_API_KEY = "{}"
+
+[claude]
+CLAUDE_API_KEY = "{}"
+
+[gemini]
+GEMINI_API_KEY = "{}"
+
+[llama]
+LLAMA_API_KEY = "{}"
+
+[huggingface]
+HUGGINGFACE_API_KEY = "{}"
+
+[openrouter]
+OPENROUTER_API_KEY = "{}"
+OPENROUTER_API_KEY_2 = "{}"
+
+[deepseek]
+DEEPSEEK_API_KEY = "{}"
+
+[github]
+GITHUB_TOKEN = "{}"
+GITHUB_TOKEN_ALT = "{}"
+""".format(
+                self.secrets.get("OPENAI_API_KEY", ""),
+                self.secrets.get("CLAUDE_API_KEY", ""),
+                self.secrets.get("GEMINI_API_KEY", ""),
+                self.secrets.get("LLAMA_API_KEY", ""),
+                self.secrets.get("HUGGINGFACE_API_KEY", ""),
+                self.secrets.get("OPENROUTER_API_KEY", ""),
+                self.secrets.get("OPENROUTER_API_KEY_2", ""),
+                self.secrets.get("DEEPSEEK_API_KEY", ""),
+                self.secrets.get("GITHUB_TOKEN", ""),
+                self.secrets.get("GITHUB_TOKEN_ALT", "")
+            )
             
             # Write to file
-            with open(secrets_path, 'w') as f:
-                toml.dump(secrets_data, f)
+            filepath = os.path.join(directory, "secrets.toml")
+            with open(filepath, "w") as f:
+                f.write(content)
             
+            print(f"Created secrets.toml at {filepath}")
             return True
         except Exception as e:
-            print(f"Error creating secrets.toml: {str(e)}")
+            print(f"Error creating secrets.toml: {e}")
             return False

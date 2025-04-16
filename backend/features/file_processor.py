@@ -1,412 +1,282 @@
 import os
+import asyncio
+from typing import Dict, Any, Optional, List
+import aiohttp
 import json
+import tempfile
 import mimetypes
-from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime
+import PyPDF2
+import csv
+import re
 
 class FileProcessor:
     """
-    Processes various file types for AI consumption.
+    Processes uploaded files for the Multi-AI application.
+    Extracts text content from various file formats and prepares it for AI analysis.
     """
     
-    def __init__(self):
+    def __init__(self, max_file_size_mb: int = 10):
         """
         Initialize the file processor.
-        """
-        self.supported_extensions = {
-            # Documents
-            ".txt": "text/plain",
-            ".md": "text/markdown",
-            ".pdf": "application/pdf",
-            ".doc": "application/msword",
-            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            
-            # Spreadsheets
-            ".csv": "text/csv",
-            ".xls": "application/vnd.ms-excel",
-            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            
-            # Code
-            ".py": "text/x-python",
-            ".js": "text/javascript",
-            ".html": "text/html",
-            ".css": "text/css",
-            ".json": "application/json",
-            
-            # Images
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-            ".gif": "image/gif",
-            ".svg": "image/svg+xml",
-            ".webp": "image/webp",
-            
-            # Audio
-            ".mp3": "audio/mpeg",
-            ".wav": "audio/wav",
-            ".ogg": "audio/ogg",
-            
-            # Video
-            ".mp4": "video/mp4",
-            ".webm": "video/webm",
-            
-            # Archives
-            ".zip": "application/zip",
-            ".tar": "application/x-tar",
-            ".gz": "application/gzip"
-        }
-        
-        # Ensure MIME types are registered
-        for ext, mime_type in self.supported_extensions.items():
-            mimetypes.add_type(mime_type, ext)
-    
-    def get_file_extension(self, filename: str) -> str:
-        """
-        Get the file extension from a filename.
         
         Args:
-            filename: Input filename
-            
-        Returns:
-            File extension (including dot)
+            max_file_size_mb: Maximum file size in MB
         """
-        _, ext = os.path.splitext(filename)
-        return ext.lower()
+        self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
+        self.storage_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "files")
+        
+        # Create storage directory if it doesn't exist
+        os.makedirs(self.storage_dir, exist_ok=True)
     
-    def get_mime_type(self, filename: str) -> str:
+    async def process_file(self, file_content: bytes, filename: str) -> Dict[str, Any]:
         """
-        Get the MIME type for a file.
+        Process an uploaded file.
         
         Args:
-            filename: Input filename
+            file_content: Binary content of the file
+            filename: Name of the file
             
         Returns:
-            MIME type
+            Dict containing file information and processing status
         """
-        ext = self.get_file_extension(filename)
-        
-        if ext in self.supported_extensions:
-            return self.supported_extensions[ext]
-        
-        # Fallback to system MIME type detection
-        mime_type, _ = mimetypes.guess_type(filename)
-        return mime_type or "application/octet-stream"
-    
-    def is_supported_file_type(self, filename: str) -> bool:
-        """
-        Check if a file type is supported.
-        
-        Args:
-            filename: Input filename
+        try:
+            # Check file size
+            if len(file_content) > self.max_file_size_bytes:
+                return {
+                    "success": False,
+                    "error": f"File size exceeds maximum allowed ({self.max_file_size_bytes / 1024 / 1024:.1f} MB)"
+                }
             
-        Returns:
-            True if supported, False otherwise
-        """
-        ext = self.get_file_extension(filename)
-        return ext in self.supported_extensions
+            # Determine file type
+            file_extension = os.path.splitext(filename)[1].lower()
+            mime_type, _ = mimetypes.guess_type(filename)
+            
+            if not mime_type:
+                mime_type = "application/octet-stream"
+            
+            # Save the file
+            file_path = os.path.join(self.storage_dir, filename)
+            with open(file_path, "wb") as f:
+                f.write(file_content)
+            
+            # Get file info
+            file_info = self.get_file_info(file_path)
+            
+            # Extract text preview if possible
+            success, text_preview, error = await self.extract_text_from_file(file_path, max_length=500)
+            
+            if success:
+                file_info["has_text"] = True
+                file_info["text_preview"] = text_preview
+            else:
+                file_info["has_text"] = False
+                file_info["text_preview"] = None
+                file_info["extraction_error"] = error
+            
+            return {
+                "success": True,
+                "file_info": file_info
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error processing file: {str(e)}"
+            }
     
-    def process_file(self, file_path: str) -> Dict[str, Any]:
+    def get_file_info(self, file_path: str) -> Dict[str, Any]:
         """
-        Process a file for AI consumption.
+        Get information about a file.
         
         Args:
             file_path: Path to the file
             
         Returns:
-            Processed file data
+            Dict containing file information
         """
-        if not os.path.exists(file_path):
-            return {"error": f"File not found: {file_path}"}
-        
-        filename = os.path.basename(file_path)
-        ext = self.get_file_extension(filename)
-        mime_type = self.get_mime_type(filename)
-        
-        # Get file metadata
-        file_size = os.path.getsize(file_path)
-        modified_time = os.path.getmtime(file_path)
-        
-        # Initialize result
-        result = {
-            "filename": filename,
-            "extension": ext,
-            "mime_type": mime_type,
-            "file_size": file_size,
-            "modified_time": datetime.fromtimestamp(modified_time).isoformat(),
-            "content_type": self._get_content_type(mime_type),
-            "extracted_text": None,
-            "error": None
-        }
-        
-        # Extract content based on file type
         try:
-            if mime_type.startswith("text/"):
-                # Text files
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    result["extracted_text"] = f.read()
+            # Get file stats
+            file_stats = os.stat(file_path)
+            file_size = file_stats.st_size
             
-            elif mime_type == "application/pdf":
-                # PDF files
-                result["extracted_text"] = self._extract_pdf_text(file_path)
+            # Get file name and extension
+            filename = os.path.basename(file_path)
+            file_extension = os.path.splitext(filename)[1].lower()
             
-            elif mime_type in ["application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
-                # Word documents
-                result["extracted_text"] = self._extract_doc_text(file_path)
+            # Determine MIME type
+            mime_type, _ = mimetypes.guess_type(filename)
             
-            elif mime_type in ["text/csv", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]:
-                # Spreadsheets
-                result["extracted_text"] = self._extract_spreadsheet_text(file_path)
+            if not mime_type:
+                mime_type = "application/octet-stream"
             
-            elif mime_type.startswith("image/"):
-                # Images - no text extraction, but mark as processed
-                result["content_type"] = "image"
-            
-            elif mime_type.startswith("audio/"):
-                # Audio - no text extraction, but mark as processed
-                result["content_type"] = "audio"
-            
-            elif mime_type.startswith("video/"):
-                # Video - no text extraction, but mark as processed
-                result["content_type"] = "video"
-            
-            elif mime_type in ["application/zip", "application/x-tar", "application/gzip"]:
-                # Archives - list contents
-                result["extracted_text"] = self._list_archive_contents(file_path)
-            
+            # Format file size for display
+            if file_size < 1024:
+                size_human = f"{file_size} bytes"
+            elif file_size < 1024 * 1024:
+                size_human = f"{file_size / 1024:.1f} KB"
             else:
-                # Unsupported file type
-                result["error"] = f"Unsupported file type: {mime_type}"
-        
+                size_human = f"{file_size / 1024 / 1024:.1f} MB"
+            
+            return {
+                "path": file_path,
+                "filename": filename,
+                "extension": file_extension,
+                "mime_type": mime_type,
+                "size": file_size,
+                "size_human": size_human
+            }
         except Exception as e:
-            result["error"] = f"Error processing file: {str(e)}"
-        
-        return result
+            return {
+                "path": file_path,
+                "filename": os.path.basename(file_path),
+                "error": str(e)
+            }
     
-    def _get_content_type(self, mime_type: str) -> str:
+    async def extract_text_from_file(self, file_path: str, max_length: Optional[int] = None) -> tuple:
         """
-        Get content type category from MIME type.
+        Extract text content from a file.
         
         Args:
-            mime_type: MIME type
+            file_path: Path to the file
+            max_length: Maximum length of text to extract
             
         Returns:
-            Content type category
+            Tuple of (success, text_content, error_message)
         """
-        if mime_type.startswith("text/"):
-            return "text"
-        elif mime_type.startswith("image/"):
-            return "image"
-        elif mime_type.startswith("audio/"):
-            return "audio"
-        elif mime_type.startswith("video/"):
-            return "video"
-        elif mime_type in ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
-            return "document"
-        elif mime_type in ["text/csv", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]:
-            return "spreadsheet"
-        elif mime_type in ["application/zip", "application/x-tar", "application/gzip"]:
-            return "archive"
-        else:
-            return "binary"
+        try:
+            # Get file extension
+            file_extension = os.path.splitext(file_path)[1].lower()
+            
+            # Extract text based on file type
+            if file_extension in ['.txt', '.md', '.py', '.js', '.html', '.css', '.json', '.xml']:
+                # Text file
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    text = f.read()
+            elif file_extension == '.pdf':
+                # PDF file
+                text = self._extract_text_from_pdf(file_path)
+            elif file_extension == '.csv':
+                # CSV file
+                text = self._extract_text_from_csv(file_path)
+            else:
+                return False, None, f"Unsupported file type: {file_extension}"
+            
+            # Truncate if needed
+            if max_length and len(text) > max_length:
+                text = text[:max_length] + "..."
+            
+            return True, text, None
+        except Exception as e:
+            return False, None, f"Error extracting text: {str(e)}"
     
-    def _extract_pdf_text(self, file_path: str) -> str:
+    def _extract_text_from_pdf(self, file_path: str) -> str:
         """
-        Extract text from PDF file.
+        Extract text from a PDF file.
         
         Args:
-            file_path: Path to PDF file
+            file_path: Path to the PDF file
             
         Returns:
             Extracted text
         """
+        text = ""
+        
         try:
-            import PyPDF2
-            
-            text = []
             with open(file_path, 'rb') as f:
                 pdf_reader = PyPDF2.PdfReader(f)
+                
                 for page_num in range(len(pdf_reader.pages)):
                     page = pdf_reader.pages[page_num]
-                    text.append(page.extract_text())
+                    text += page.extract_text() + "\n\n"
             
-            return "\n\n".join(text)
-        
-        except ImportError:
-            # Fallback to command-line tools
-            try:
-                import subprocess
-                result = subprocess.run(['pdftotext', file_path, '-'], capture_output=True, text=True)
-                return result.stdout
-            except:
-                return "[PDF text extraction requires PyPDF2 or pdftotext]"
+            return text
+        except Exception as e:
+            raise Exception(f"Error extracting text from PDF: {str(e)}")
     
-    def _extract_doc_text(self, file_path: str) -> str:
+    def _extract_text_from_csv(self, file_path: str) -> str:
         """
-        Extract text from Word document.
+        Extract text from a CSV file.
         
         Args:
-            file_path: Path to Word document
+            file_path: Path to the CSV file
             
         Returns:
             Extracted text
+        """
+        text = ""
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                csv_reader = csv.reader(f)
+                
+                # Get header
+                header = next(csv_reader, None)
+                
+                if header:
+                    text += ", ".join(header) + "\n"
+                
+                # Get rows (limit to 100)
+                row_count = 0
+                for row in csv_reader:
+                    text += ", ".join(row) + "\n"
+                    row_count += 1
+                    
+                    if row_count >= 100:
+                        text += "...\n(CSV file truncated, showing first 100 rows)"
+                        break
+            
+            return text
+        except Exception as e:
+            raise Exception(f"Error extracting text from CSV: {str(e)}")
+    
+    def create_prompt_with_file_content(self, prompt: str, file_content: str, file_info: Dict[str, Any]) -> str:
+        """
+        Create a prompt that includes file content.
+        
+        Args:
+            prompt: Original user prompt
+            file_content: Extracted text content from the file
+            file_info: Information about the file
+            
+        Returns:
+            Enhanced prompt with file content
+        """
+        # Create a header with file information
+        file_header = f"File: {file_info['filename']} ({file_info['size_human']})\n"
+        file_header += f"Type: {file_info['mime_type']}\n\n"
+        
+        # Determine how to format the content based on file type
+        file_extension = file_info['extension'].lower()
+        
+        if file_extension in ['.py', '.js', '.html', '.css', '.json', '.xml']:
+            # Code file - wrap in code block
+            formatted_content = f"```{file_extension[1:]}\n{file_content}\n```"
+        elif file_extension == '.md':
+            # Markdown file - keep as is
+            formatted_content = file_content
+        else:
+            # Other file types - wrap in quotes
+            formatted_content = f"```\n{file_content}\n```"
+        
+        # Combine everything
+        enhanced_prompt = f"{prompt}\n\n{file_header}{formatted_content}"
+        
+        return enhanced_prompt
+    
+    def delete_file(self, file_path: str) -> bool:
+        """
+        Delete a file.
+        
+        Args:
+            file_path: Path to the file
+            
+        Returns:
+            True if deletion was successful, False otherwise
         """
         try:
-            import docx
-            
-            if file_path.endswith('.docx'):
-                doc = docx.Document(file_path)
-                return "\n\n".join(paragraph.text for paragraph in doc.paragraphs)
-            else:
-                return "[DOC text extraction requires conversion to DOCX]"
-        
-        except ImportError:
-            return "[Word document text extraction requires python-docx]"
-    
-    def _extract_spreadsheet_text(self, file_path: str) -> str:
-        """
-        Extract text from spreadsheet.
-        
-        Args:
-            file_path: Path to spreadsheet
-            
-        Returns:
-            Extracted text
-        """
-        if file_path.endswith('.csv'):
-            try:
-                import csv
-                
-                rows = []
-                with open(file_path, 'r', newline='') as f:
-                    csv_reader = csv.reader(f)
-                    for row in csv_reader:
-                        rows.append(",".join(row))
-                
-                return "\n".join(rows)
-            
-            except Exception as e:
-                return f"[CSV parsing error: {str(e)}]"
-        
-        else:
-            try:
-                import pandas as pd
-                
-                if file_path.endswith('.xlsx'):
-                    df = pd.read_excel(file_path)
-                    return df.to_string()
-                else:
-                    return "[Excel text extraction requires pandas and openpyxl]"
-            
-            except ImportError:
-                return "[Spreadsheet text extraction requires pandas and openpyxl]"
-    
-    def _list_archive_contents(self, file_path: str) -> str:
-        """
-        List contents of archive file.
-        
-        Args:
-            file_path: Path to archive
-            
-        Returns:
-            List of archive contents
-        """
-        if file_path.endswith('.zip'):
-            try:
-                import zipfile
-                
-                with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                    file_list = zip_ref.namelist()
-                
-                return "Archive contents:\n" + "\n".join(file_list)
-            
-            except Exception as e:
-                return f"[ZIP parsing error: {str(e)}]"
-        
-        elif file_path.endswith(('.tar', '.gz')):
-            try:
-                import tarfile
-                
-                with tarfile.open(file_path, 'r:*') as tar_ref:
-                    file_list = tar_ref.getnames()
-                
-                return "Archive contents:\n" + "\n".join(file_list)
-            
-            except Exception as e:
-                return f"[TAR parsing error: {str(e)}]"
-        
-        else:
-            return "[Unsupported archive format]"
-    
-    def extract_text_chunk(self, file_path: str, chunk_size: int = 4000) -> List[str]:
-        """
-        Extract text from file in chunks.
-        
-        Args:
-            file_path: Path to file
-            chunk_size: Maximum chunk size in characters
-            
-        Returns:
-            List of text chunks
-        """
-        result = self.process_file(file_path)
-        
-        if result["error"] or not result["extracted_text"]:
-            return [result.get("error", "No text could be extracted")]
-        
-        text = result["extracted_text"]
-        
-        # Split into chunks
-        chunks = []
-        for i in range(0, len(text), chunk_size):
-            chunks.append(text[i:i+chunk_size])
-        
-        return chunks
-    
-    def get_file_metadata(self, file_path: str) -> Dict[str, Any]:
-        """
-        Get metadata for a file.
-        
-        Args:
-            file_path: Path to file
-            
-        Returns:
-            File metadata
-        """
-        if not os.path.exists(file_path):
-            return {"error": f"File not found: {file_path}"}
-        
-        filename = os.path.basename(file_path)
-        ext = self.get_file_extension(filename)
-        mime_type = self.get_mime_type(filename)
-        
-        # Get file stats
-        stats = os.stat(file_path)
-        
-        return {
-            "filename": filename,
-            "extension": ext,
-            "mime_type": mime_type,
-            "content_type": self._get_content_type(mime_type),
-            "file_size": stats.st_size,
-            "created_time": datetime.fromtimestamp(stats.st_ctime).isoformat(),
-            "modified_time": datetime.fromtimestamp(stats.st_mtime).isoformat(),
-            "accessed_time": datetime.fromtimestamp(stats.st_atime).isoformat(),
-            "is_supported": self.is_supported_file_type(filename)
-        }
-    
-    def batch_process_files(self, file_paths: List[str]) -> Dict[str, Any]:
-        """
-        Process multiple files.
-        
-        Args:
-            file_paths: List of file paths
-            
-        Returns:
-            Dictionary of file paths to processing results
-        """
-        results = {}
-        
-        for file_path in file_paths:
-            results[file_path] = self.process_file(file_path)
-        
-        return results
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                return True
+            return False
+        except Exception as e:
+            print(f"Error deleting file: {e}")
+            return False

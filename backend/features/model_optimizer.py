@@ -1,479 +1,465 @@
 import os
-import json
+import asyncio
 from typing import Dict, Any, Optional, List
+import aiohttp
+import json
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import io
+import base64
+from datetime import datetime
 
 class ModelOptimizer:
     """
-    Optimizes model selection and parameters based on task type and user preferences.
+    Optimizes model selection and parameters based on performance data.
+    Analyzes response quality, latency, and cost to recommend optimal models.
     """
     
     def __init__(self):
+        """Initialize the model optimizer."""
+        self.storage_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "optimization")
+        
+        # Create storage directory if it doesn't exist
+        os.makedirs(self.storage_dir, exist_ok=True)
+        
+        # Initialize performance data
+        self.performance_data = self._load_performance_data()
+    
+    def _load_performance_data(self) -> Dict[str, Any]:
         """
-        Initialize the model optimizer.
+        Load performance data from storage.
+        
+        Returns:
+            Dict containing performance data
         """
-        self.task_types = {
-            "general_conversation": {
-                "description": "General conversation and chat",
-                "recommended_models": {
-                    "openai": ["gpt-3.5-turbo"],
-                    "claude": ["claude-3-haiku"],
-                    "gemini": ["gemini-pro"],
-                    "llama": ["llama-3-8b"],
-                    "deepseek": ["deepseek-chat"]
-                },
-                "parameters": {
-                    "temperature": 0.7,
-                    "max_tokens": 800
+        filepath = os.path.join(self.storage_dir, "performance_data.json")
+        
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, "r") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error loading performance data: {e}")
+                return self._initialize_performance_data()
+        else:
+            return self._initialize_performance_data()
+    
+    def _initialize_performance_data(self) -> Dict[str, Any]:
+        """
+        Initialize empty performance data structure.
+        
+        Returns:
+            Dict containing empty performance data
+        """
+        return {
+            "models": {},
+            "requests": [],
+            "optimizations": []
+        }
+    
+    def _save_performance_data(self) -> bool:
+        """
+        Save performance data to storage.
+        
+        Returns:
+            True if saving was successful, False otherwise
+        """
+        filepath = os.path.join(self.storage_dir, "performance_data.json")
+        
+        try:
+            with open(filepath, "w") as f:
+                json.dump(self.performance_data, f, indent=2)
+            return True
+        except Exception as e:
+            print(f"Error saving performance data: {e}")
+            return False
+    
+    def record_request(self, model: str, prompt: str, response: Dict[str, Any], 
+                      latency: float, tokens: Dict[str, int], 
+                      conversation_id: Optional[str] = None) -> bool:
+        """
+        Record a model request and its performance metrics.
+        
+        Args:
+            model: The model that was used
+            prompt: The prompt that was sent
+            response: The response that was received
+            latency: Request latency in seconds
+            tokens: Dict with prompt_tokens, completion_tokens, and total_tokens
+            conversation_id: Unique identifier for the conversation
+            
+        Returns:
+            True if recording was successful, False otherwise
+        """
+        try:
+            # Initialize model data if it doesn't exist
+            if model not in self.performance_data["models"]:
+                self.performance_data["models"][model] = {
+                    "requests": 0,
+                    "total_latency": 0,
+                    "avg_latency": 0,
+                    "total_tokens": 0,
+                    "avg_tokens_per_request": 0,
+                    "success_rate": 100.0,
+                    "failures": 0
                 }
-            },
-            "creative_writing": {
-                "description": "Creative writing, storytelling, and content generation",
-                "recommended_models": {
-                    "openai": ["gpt-4"],
-                    "claude": ["claude-3-opus"],
-                    "gemini": ["gemini-pro"],
-                    "llama": ["llama-3-70b"],
-                    "deepseek": ["deepseek-chat"]
-                },
-                "parameters": {
-                    "temperature": 0.8,
-                    "max_tokens": 1500
-                }
-            },
-            "code_generation": {
-                "description": "Code generation and programming assistance",
-                "recommended_models": {
-                    "openai": ["gpt-4"],
-                    "claude": ["claude-3-opus"],
-                    "gemini": ["gemini-pro"],
-                    "llama": ["llama-3-70b"],
-                    "deepseek": ["deepseek-coder"]
-                },
-                "parameters": {
-                    "temperature": 0.3,
-                    "max_tokens": 2000
-                }
-            },
-            "data_analysis": {
-                "description": "Data analysis and interpretation",
-                "recommended_models": {
-                    "openai": ["gpt-4"],
-                    "claude": ["claude-3-opus"],
-                    "gemini": ["gemini-pro"],
-                    "llama": ["llama-3-70b"],
-                    "deepseek": ["deepseek-chat"]
-                },
-                "parameters": {
-                    "temperature": 0.2,
-                    "max_tokens": 1500
-                }
-            },
-            "summarization": {
-                "description": "Text summarization",
-                "recommended_models": {
-                    "openai": ["gpt-3.5-turbo"],
-                    "claude": ["claude-3-haiku"],
-                    "gemini": ["gemini-pro"],
-                    "llama": ["llama-3-8b"],
-                    "deepseek": ["deepseek-chat"]
-                },
-                "parameters": {
-                    "temperature": 0.3,
-                    "max_tokens": 1000
-                }
-            },
-            "translation": {
-                "description": "Language translation",
-                "recommended_models": {
-                    "openai": ["gpt-4"],
-                    "claude": ["claude-3-sonnet"],
-                    "gemini": ["gemini-pro"],
-                    "llama": ["llama-3-70b"],
-                    "deepseek": ["deepseek-chat"]
-                },
-                "parameters": {
-                    "temperature": 0.3,
-                    "max_tokens": 1000
-                }
-            },
-            "image_analysis": {
-                "description": "Image analysis and description",
-                "recommended_models": {
-                    "openai": ["gpt-4-turbo"],
-                    "claude": ["claude-3-opus"],
-                    "gemini": ["gemini-pro-vision"],
-                    "deepseek": ["deepseek-v2"]
-                },
-                "parameters": {
-                    "temperature": 0.4,
-                    "max_tokens": 1000
-                }
+            
+            # Create request entry
+            success = response.get("success", False)
+            
+            request_entry = {
+                "model": model,
+                "timestamp": datetime.now().isoformat(),
+                "conversation_id": conversation_id,
+                "latency": latency,
+                "tokens": tokens,
+                "success": success,
+                "prompt_length": len(prompt)
             }
-        }
-        
-        self.optimization_profiles = {
-            "balanced": {
-                "description": "Balanced performance and cost",
-                "priority": ["quality", "cost"],
-                "temperature_adjustment": 0.0,
-                "max_tokens_adjustment": 0.0
-            },
-            "economy": {
-                "description": "Optimize for lower cost",
-                "priority": ["cost", "speed", "quality"],
-                "temperature_adjustment": 0.1,
-                "max_tokens_adjustment": -0.2
-            },
-            "performance": {
-                "description": "Optimize for best quality",
-                "priority": ["quality", "speed", "cost"],
-                "temperature_adjustment": -0.1,
-                "max_tokens_adjustment": 0.2
-            },
-            "speed": {
-                "description": "Optimize for faster responses",
-                "priority": ["speed", "cost", "quality"],
-                "temperature_adjustment": 0.2,
-                "max_tokens_adjustment": -0.3
-            }
-        }
-    
-    def detect_task_type(self, prompt: str) -> str:
-        """
-        Detect the most likely task type based on the prompt.
-        
-        Args:
-            prompt: User prompt
             
-        Returns:
-            Detected task type
-        """
-        # Simple keyword-based detection
-        prompt_lower = prompt.lower()
-        
-        # Check for code-related keywords
-        if any(keyword in prompt_lower for keyword in ["code", "function", "program", "algorithm", "debug"]):
-            return "code_generation"
-        
-        # Check for creative writing keywords
-        if any(keyword in prompt_lower for keyword in ["write", "story", "creative", "poem", "novel", "fiction"]):
-            return "creative_writing"
-        
-        # Check for data analysis keywords
-        if any(keyword in prompt_lower for keyword in ["data", "analyze", "statistics", "graph", "chart", "trend"]):
-            return "data_analysis"
-        
-        # Check for summarization keywords
-        if any(keyword in prompt_lower for keyword in ["summarize", "summary", "tldr", "brief", "condense"]):
-            return "summarization"
-        
-        # Check for translation keywords
-        if any(keyword in prompt_lower for keyword in ["translate", "translation", "language", "spanish", "french", "german", "chinese", "japanese"]):
-            return "translation"
-        
-        # Check for image analysis keywords
-        if any(keyword in prompt_lower for keyword in ["image", "picture", "photo", "describe", "what's in this"]):
-            return "image_analysis"
-        
-        # Default to general conversation
-        return "general_conversation"
-    
-    def get_recommended_models(self, 
-                              task_type: str, 
-                              available_providers: Optional[List[str]] = None) -> Dict[str, List[str]]:
-        """
-        Get recommended models for a specific task type.
-        
-        Args:
-            task_type: Task type
-            available_providers: Optional list of available providers
+            # Add to requests list
+            self.performance_data["requests"].append(request_entry)
             
-        Returns:
-            Dictionary of provider to list of recommended models
-        """
-        if task_type not in self.task_types:
-            task_type = "general_conversation"
-        
-        recommendations = self.task_types[task_type]["recommended_models"]
-        
-        if available_providers:
-            filtered_recommendations = {}
-            for provider in available_providers:
-                if provider in recommendations:
-                    filtered_recommendations[provider] = recommendations[provider]
-            return filtered_recommendations
-        
-        return recommendations
-    
-    def get_optimal_parameters(self, 
-                              task_type: str, 
-                              profile: str = "balanced") -> Dict[str, Any]:
-        """
-        Get optimal parameters for a specific task type and optimization profile.
-        
-        Args:
-            task_type: Task type
-            profile: Optimization profile
+            # Update model performance data
+            model_data = self.performance_data["models"][model]
+            model_data["requests"] += 1
             
-        Returns:
-            Dictionary of parameter name to value
-        """
-        if task_type not in self.task_types:
-            task_type = "general_conversation"
-        
-        if profile not in self.optimization_profiles:
-            profile = "balanced"
-        
-        # Get base parameters for task type
-        base_params = self.task_types[task_type]["parameters"].copy()
-        
-        # Apply adjustments from profile
-        profile_data = self.optimization_profiles[profile]
-        
-        # Adjust temperature
-        base_params["temperature"] += profile_data["temperature_adjustment"]
-        base_params["temperature"] = max(0.0, min(1.0, base_params["temperature"]))
-        
-        # Adjust max tokens
-        adjustment_factor = 1.0 + profile_data["max_tokens_adjustment"]
-        base_params["max_tokens"] = int(base_params["max_tokens"] * adjustment_factor)
-        base_params["max_tokens"] = max(100, base_params["max_tokens"])
-        
-        return base_params
-    
-    def optimize_for_cost(self, 
-                         task_type: str, 
-                         available_providers: List[str],
-                         credit_tracker) -> Dict[str, Any]:
-        """
-        Optimize model selection for cost.
-        
-        Args:
-            task_type: Task type
-            available_providers: List of available providers
-            credit_tracker: Credit tracker instance
-            
-        Returns:
-            Dictionary with optimized model and parameters
-        """
-        if task_type not in self.task_types:
-            task_type = "general_conversation"
-        
-        # Get recommended models for task
-        recommendations = self.get_recommended_models(task_type, available_providers)
-        
-        # Find lowest cost model
-        lowest_cost = float('inf')
-        best_provider = None
-        best_model = None
-        
-        for provider, models in recommendations.items():
-            for model in models:
-                # Get cost per token
-                cost_info = credit_tracker.get_cost_per_token(provider, model)
-                cost_per_1k = cost_info["cost_per_1k_tokens"]
+            if success:
+                model_data["total_latency"] += latency
+                model_data["avg_latency"] = model_data["total_latency"] / (model_data["requests"] - model_data["failures"])
                 
-                if cost_per_1k < lowest_cost:
-                    lowest_cost = cost_per_1k
-                    best_provider = provider
-                    best_model = model
-        
-        # If no model found, use default
-        if not best_provider:
-            best_provider = "openai"
-            best_model = "gpt-3.5-turbo"
-        
-        # Get parameters optimized for economy
-        params = self.get_optimal_parameters(task_type, "economy")
-        
-        return {
-            "provider": best_provider,
-            "model": best_model,
-            "parameters": params
-        }
-    
-    def optimize_for_quality(self, 
-                            task_type: str, 
-                            available_providers: List[str]) -> Dict[str, Any]:
-        """
-        Optimize model selection for quality.
-        
-        Args:
-            task_type: Task type
-            available_providers: List of available providers
-            
-        Returns:
-            Dictionary with optimized model and parameters
-        """
-        if task_type not in self.task_types:
-            task_type = "general_conversation"
-        
-        # Quality ranking of providers (subjective)
-        quality_ranking = {
-            "openai": {"gpt-4": 9, "gpt-4-turbo": 8.5, "gpt-3.5-turbo": 7},
-            "claude": {"claude-3-opus": 9, "claude-3-sonnet": 8, "claude-3-haiku": 7},
-            "gemini": {"gemini-pro": 7.5, "gemini-pro-vision": 8},
-            "llama": {"llama-3-70b": 8, "llama-3-8b": 6.5},
-            "deepseek": {"deepseek-chat": 7, "deepseek-coder": 8, "deepseek-v2": 7.5}
-        }
-        
-        # Get recommended models for task
-        recommendations = self.get_recommended_models(task_type, available_providers)
-        
-        # Find highest quality model
-        highest_quality = -1
-        best_provider = None
-        best_model = None
-        
-        for provider, models in recommendations.items():
-            if provider not in quality_ranking:
-                continue
-                
-            for model in models:
-                if model not in quality_ranking[provider]:
-                    continue
-                    
-                quality_score = quality_ranking[provider][model]
-                
-                if quality_score > highest_quality:
-                    highest_quality = quality_score
-                    best_provider = provider
-                    best_model = model
-        
-        # If no model found, use default
-        if not best_provider:
-            best_provider = "openai"
-            best_model = "gpt-4"
-        
-        # Get parameters optimized for performance
-        params = self.get_optimal_parameters(task_type, "performance")
-        
-        return {
-            "provider": best_provider,
-            "model": best_model,
-            "parameters": params
-        }
-    
-    def optimize_for_speed(self, 
-                          task_type: str, 
-                          available_providers: List[str]) -> Dict[str, Any]:
-        """
-        Optimize model selection for speed.
-        
-        Args:
-            task_type: Task type
-            available_providers: List of available providers
-            
-        Returns:
-            Dictionary with optimized model and parameters
-        """
-        if task_type not in self.task_types:
-            task_type = "general_conversation"
-        
-        # Speed ranking of providers (subjective)
-        speed_ranking = {
-            "openai": {"gpt-4": 6, "gpt-4-turbo": 7, "gpt-3.5-turbo": 9},
-            "claude": {"claude-3-opus": 6, "claude-3-sonnet": 7, "claude-3-haiku": 9},
-            "gemini": {"gemini-pro": 8, "gemini-pro-vision": 7},
-            "llama": {"llama-3-70b": 6, "llama-3-8b": 8},
-            "deepseek": {"deepseek-chat": 8, "deepseek-coder": 7, "deepseek-v2": 6}
-        }
-        
-        # Get recommended models for task
-        recommendations = self.get_recommended_models(task_type, available_providers)
-        
-        # Find fastest model
-        highest_speed = -1
-        best_provider = None
-        best_model = None
-        
-        for provider, models in recommendations.items():
-            if provider not in speed_ranking:
-                continue
-                
-            for model in models:
-                if model not in speed_ranking[provider]:
-                    continue
-                    
-                speed_score = speed_ranking[provider][model]
-                
-                if speed_score > highest_speed:
-                    highest_speed = speed_score
-                    best_provider = provider
-                    best_model = model
-        
-        # If no model found, use default
-        if not best_provider:
-            best_provider = "openai"
-            best_model = "gpt-3.5-turbo"
-        
-        # Get parameters optimized for speed
-        params = self.get_optimal_parameters(task_type, "speed")
-        
-        return {
-            "provider": best_provider,
-            "model": best_model,
-            "parameters": params
-        }
-    
-    def optimize_model_selection(self, 
-                                prompt: str, 
-                                available_providers: List[str],
-                                optimization_goal: str = "balanced",
-                                credit_tracker = None) -> Dict[str, Any]:
-        """
-        Optimize model selection based on prompt, available providers, and optimization goal.
-        
-        Args:
-            prompt: User prompt
-            available_providers: List of available providers
-            optimization_goal: Optimization goal (balanced, cost, quality, speed)
-            credit_tracker: Optional credit tracker for cost optimization
-            
-        Returns:
-            Dictionary with optimized model and parameters
-        """
-        # Detect task type
-        task_type = self.detect_task_type(prompt)
-        
-        # Optimize based on goal
-        if optimization_goal == "cost":
-            if credit_tracker:
-                return self.optimize_for_cost(task_type, available_providers, credit_tracker)
+                total_tokens = tokens.get("total_tokens", 0)
+                model_data["total_tokens"] += total_tokens
+                model_data["avg_tokens_per_request"] = model_data["total_tokens"] / (model_data["requests"] - model_data["failures"])
             else:
-                optimization_goal = "balanced"
+                model_data["failures"] += 1
+            
+            model_data["success_rate"] = ((model_data["requests"] - model_data["failures"]) / model_data["requests"]) * 100
+            
+            # Save performance data
+            return self._save_performance_data()
+        except Exception as e:
+            print(f"Error recording request: {e}")
+            return False
+    
+    def get_model_performance(self, model: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get performance data for a specific model or all models.
         
-        if optimization_goal == "quality":
-            return self.optimize_for_quality(task_type, available_providers)
+        Args:
+            model: The model to get performance data for, or None for all models
+            
+        Returns:
+            Dict containing performance data
+        """
+        if model:
+            return self.performance_data["models"].get(model, {
+                "requests": 0,
+                "total_latency": 0,
+                "avg_latency": 0,
+                "total_tokens": 0,
+                "avg_tokens_per_request": 0,
+                "success_rate": 0,
+                "failures": 0
+            })
+        else:
+            return {
+                "models": self.performance_data["models"],
+                "total_requests": len(self.performance_data["requests"])
+            }
+    
+    def recommend_model(self, prompt: str, priority: str = "balanced") -> Dict[str, Any]:
+        """
+        Recommend the best model for a given prompt based on performance data.
         
-        if optimization_goal == "speed":
-            return self.optimize_for_speed(task_type, available_providers)
+        Args:
+            prompt: The prompt to be processed
+            priority: Optimization priority (speed, quality, cost, or balanced)
+            
+        Returns:
+            Dict containing the recommended model and parameters
+        """
+        try:
+            # Get available models
+            models = self.performance_data["models"]
+            
+            if not models:
+                return {
+                    "model": None,
+                    "parameters": {},
+                    "reason": "No performance data available for any model"
+                }
+            
+            # Calculate prompt complexity
+            prompt_length = len(prompt)
+            prompt_complexity = self._calculate_prompt_complexity(prompt)
+            
+            # Score models based on priority
+            model_scores = {}
+            
+            for model_name, model_data in models.items():
+                if model_data["requests"] < 5:
+                    # Not enough data for reliable recommendation
+                    continue
+                
+                # Calculate base scores (0-100 scale)
+                speed_score = 100 - min(100, (model_data["avg_latency"] / 10) * 100)  # Lower latency is better
+                quality_score = model_data["success_rate"]  # Higher success rate is better
+                efficiency_score = 100 - min(100, (model_data["avg_tokens_per_request"] / 2000) * 100)  # Lower token usage is better
+                
+                # Adjust for prompt complexity
+                if prompt_complexity > 0.7:  # High complexity
+                    quality_score *= 1.2  # Boost quality importance
+                    speed_score *= 0.8  # Reduce speed importance
+                elif prompt_complexity < 0.3:  # Low complexity
+                    quality_score *= 0.9  # Reduce quality importance
+                    speed_score *= 1.1  # Boost speed importance
+                
+                # Calculate weighted score based on priority
+                if priority == "speed":
+                    final_score = speed_score * 0.7 + quality_score * 0.2 + efficiency_score * 0.1
+                elif priority == "quality":
+                    final_score = quality_score * 0.7 + speed_score * 0.1 + efficiency_score * 0.2
+                elif priority == "cost":
+                    final_score = efficiency_score * 0.7 + speed_score * 0.2 + quality_score * 0.1
+                else:  # balanced
+                    final_score = speed_score * 0.33 + quality_score * 0.34 + efficiency_score * 0.33
+                
+                model_scores[model_name] = {
+                    "final_score": final_score,
+                    "speed_score": speed_score,
+                    "quality_score": quality_score,
+                    "efficiency_score": efficiency_score
+                }
+            
+            if not model_scores:
+                return {
+                    "model": None,
+                    "parameters": {},
+                    "reason": "Not enough performance data for reliable recommendations"
+                }
+            
+            # Find the best model
+            best_model = max(model_scores.items(), key=lambda x: x[1]["final_score"])
+            model_name = best_model[0]
+            scores = best_model[1]
+            
+            # Determine optimal parameters based on prompt complexity
+            parameters = self._get_optimal_parameters(model_name, prompt_complexity, priority)
+            
+            # Create recommendation entry
+            recommendation = {
+                "timestamp": datetime.now().isoformat(),
+                "prompt_length": prompt_length,
+                "prompt_complexity": prompt_complexity,
+                "priority": priority,
+                "recommended_model": model_name,
+                "scores": scores,
+                "parameters": parameters
+            }
+            
+            # Add to optimizations list
+            self.performance_data["optimizations"].append(recommendation)
+            self._save_performance_data()
+            
+            return {
+                "model": model_name,
+                "parameters": parameters,
+                "scores": scores,
+                "reason": f"Best {priority} performance for prompt complexity {prompt_complexity:.2f}"
+            }
+        except Exception as e:
+            print(f"Error recommending model: {e}")
+            return {
+                "model": None,
+                "parameters": {},
+                "reason": f"Error during recommendation: {str(e)}"
+            }
+    
+    def _calculate_prompt_complexity(self, prompt: str) -> float:
+        """
+        Calculate the complexity of a prompt (0.0 to 1.0 scale).
         
-        # Default: balanced optimization
-        # Get recommended models for task
-        recommendations = self.get_recommended_models(task_type, available_providers)
+        Args:
+            prompt: The prompt to analyze
+            
+        Returns:
+            Complexity score between 0.0 and 1.0
+        """
+        # Simple complexity calculation based on length, sentence structure, and special characters
+        length_factor = min(1.0, len(prompt) / 1000)  # Length up to 1000 chars
         
-        # Choose first available provider and its first recommended model
-        best_provider = None
-        best_model = None
+        # Count sentences
+        sentences = prompt.split('.')
+        sentence_count = len([s for s in sentences if len(s.strip()) > 0])
+        sentence_factor = min(1.0, sentence_count / 20)  # Up to 20 sentences
         
-        for provider, models in recommendations.items():
-            if models:
-                best_provider = provider
-                best_model = models[0]
-                break
+        # Count special characters (code indicators)
+        code_indicators = sum(1 for c in prompt if c in '{}[]()=+-*/><')
+        code_factor = min(1.0, code_indicators / 100)  # Up to 100 special chars
         
-        # If no model found, use default
-        if not best_provider:
-            best_provider = "openai"
-            best_model = "gpt-3.5-turbo"
+        # Calculate weighted complexity
+        complexity = (length_factor * 0.4) + (sentence_factor * 0.3) + (code_factor * 0.3)
         
-        # Get balanced parameters
-        params = self.get_optimal_parameters(task_type, "balanced")
+        return complexity
+    
+    def _get_optimal_parameters(self, model: str, complexity: float, priority: str) -> Dict[str, Any]:
+        """
+        Get optimal parameters for a model based on prompt complexity and priority.
         
-        return {
-            "provider": best_provider,
-            "model": best_model,
-            "parameters": params,
-            "task_type": task_type
+        Args:
+            model: The model to get parameters for
+            complexity: Prompt complexity score (0.0 to 1.0)
+            priority: Optimization priority
+            
+        Returns:
+            Dict containing optimal parameters
+        """
+        # Base parameters
+        parameters = {
+            "temperature": 0.7,
+            "max_tokens": 1000,
+            "top_p": 0.9
         }
+        
+        # Adjust based on complexity and priority
+        if priority == "speed":
+            parameters["temperature"] = 0.5  # Lower temperature for faster responses
+            parameters["max_tokens"] = int(500 + (complexity * 500))  # 500-1000 based on complexity
+        elif priority == "quality":
+            parameters["temperature"] = 0.3 + (complexity * 0.4)  # 0.3-0.7 based on complexity
+            parameters["max_tokens"] = int(1000 + (complexity * 1000))  # 1000-2000 based on complexity
+            parameters["top_p"] = 0.95  # Higher top_p for better quality
+        elif priority == "cost":
+            parameters["temperature"] = 0.7  # Standard temperature
+            parameters["max_tokens"] = int(300 + (complexity * 700))  # 300-1000 based on complexity
+        else:  # balanced
+            parameters["temperature"] = 0.5 + (complexity * 0.3)  # 0.5-0.8 based on complexity
+            parameters["max_tokens"] = int(800 + (complexity * 700))  # 800-1500 based on complexity
+        
+        return parameters
+    
+    def generate_performance_chart(self) -> Optional[str]:
+        """
+        Generate a chart of model performance metrics.
+        
+        Returns:
+            Base64-encoded PNG image of the chart, or None if generation failed
+        """
+        try:
+            # Get model data
+            models = self.performance_data["models"]
+            
+            if not models:
+                return None
+            
+            # Prepare data for chart
+            model_names = []
+            avg_latencies = []
+            success_rates = []
+            avg_tokens = []
+            
+            for model, data in models.items():
+                if data["requests"] > 0:
+                    model_names.append(model)
+                    avg_latencies.append(data["avg_latency"])
+                    success_rates.append(data["success_rate"])
+                    avg_tokens.append(data["avg_tokens_per_request"])
+            
+            if not model_names:
+                return None
+            
+            # Create figure with three subplots
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 15))
+            
+            # Plot average latencies
+            bars = ax1.bar(model_names, avg_latencies, color='skyblue')
+            ax1.set_title('Average Latency by Model')
+            ax1.set_xlabel('Model')
+            ax1.set_ylabel('Latency (seconds)')
+            ax1.grid(axis='y', linestyle='--', alpha=0.7)
+            
+            # Add value labels on bars
+            for bar in bars:
+                height = bar.get_height()
+                ax1.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                        f'{height:.2f}s', ha='center', va='bottom')
+            
+            # Plot success rates
+            bars = ax2.bar(model_names, success_rates, color='lightgreen')
+            ax2.set_title('Success Rate by Model')
+            ax2.set_xlabel('Model')
+            ax2.set_ylabel('Success Rate (%)')
+            ax2.set_ylim(0, 105)
+            ax2.grid(axis='y', linestyle='--', alpha=0.7)
+            
+            # Add value labels on bars
+            for bar in bars:
+                height = bar.get_height()
+                ax2.text(bar.get_x() + bar.get_width()/2., height + 1,
+                        f'{height:.1f}%', ha='center', va='bottom')
+            
+            # Plot average tokens per request
+            bars = ax3.bar(model_names, avg_tokens, color='salmon')
+            ax3.set_title('Average Tokens per Request by Model')
+            ax3.set_xlabel('Model')
+            ax3.set_ylabel('Tokens')
+            ax3.grid(axis='y', linestyle='--', alpha=0.7)
+            
+            # Add value labels on bars
+            for bar in bars:
+                height = bar.get_height()
+                ax3.text(bar.get_x() + bar.get_width()/2., height + 10,
+                        f'{int(height)}', ha='center', va='bottom')
+            
+            # Adjust layout
+            plt.tight_layout()
+            
+            # Save to buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            
+            # Convert to base64
+            img_str = base64.b64encode(buf.read()).decode('utf-8')
+            
+            # Close the figure to free memory
+            plt.close(fig)
+            
+            return img_str
+        except Exception as e:
+            print(f"Error generating performance chart: {e}")
+            return None
+    
+    def get_optimization_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get the history of model optimizations.
+        
+        Args:
+            limit: Maximum number of entries to return
+            
+        Returns:
+            List of optimization entries
+        """
+        optimizations = self.performance_data.get("optimizations", [])
+        
+        # Sort by timestamp (newest first)
+        optimizations.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        
+        # Limit the number of entries
+        return optimizations[:limit]
+    
+    def clear_performance_data(self) -> bool:
+        """
+        Clear all performance data.
+        
+        Returns:
+            True if clearing was successful, False otherwise
+        """
+        try:
+            self.performance_data = self._initialize_performance_data()
+            return self._save_performance_data()
+        except Exception as e:
+            print(f"Error clearing performance data: {e}")
+            return False

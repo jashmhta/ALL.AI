@@ -19,6 +19,7 @@ class LlamaClient:
         self.api_key = api_key or os.getenv("LLAMA_API_KEY")
         self.api_base_url = "https://api.llama-api.com"
         
+<<<<<<< HEAD
     async def generate_response(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """
         Get a response from the Llama API.
@@ -43,6 +44,8 @@ class LlamaClient:
             max_tokens=max_tokens
         )
         
+=======
+>>>>>>> main
     async def get_response(self, prompt: str, temperature: float = 0.7, max_tokens: int = 1000) -> Dict[str, Any]:
         """
         Get a response from the Llama API.

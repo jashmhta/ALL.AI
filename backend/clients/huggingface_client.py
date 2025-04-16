@@ -1,12 +1,12 @@
 import os
-import json
-import requests
+import asyncio
 from typing import Dict, Any, Optional, List
+import aiohttp
+import json
 
 class HuggingFaceClient:
     """
-    Client for interacting with HuggingFace Inference API.
-    Supports various models hosted on HuggingFace.
+    Client for interacting with the HuggingFace Inference API.
     """
     
     def __init__(self, api_key: Optional[str] = None):
@@ -14,329 +14,158 @@ class HuggingFaceClient:
         Initialize the HuggingFace client.
         
         Args:
-            api_key: HuggingFace API key
+            api_key: API key for HuggingFace API (optional, will use environment variable if not provided)
         """
-        self.api_key = api_key or os.environ.get("HUGGINGFACE_API_KEY", "")
-        self.base_url = "https://api-inference.huggingface.co/models"
-        self.available_models = {
-            "mistral-7b": {
-                "model_id": "mistralai/Mistral-7B-Instruct-v0.2",
-                "max_tokens": 8192,
-                "supports_vision": False
-            },
-            "falcon-40b": {
-                "model_id": "tiiuae/falcon-40b-instruct",
-                "max_tokens": 2048,
-                "supports_vision": False
-            },
-            "llama-2-13b": {
-                "model_id": "meta-llama/Llama-2-13b-chat-hf",
-                "max_tokens": 4096,
-                "supports_vision": False
-            }
-        }
-        self.default_model = "mistral-7b"
-    
-    def query(self, 
-             prompt: str, 
-             model: Optional[str] = None, 
-             max_tokens: int = 1000, 
-             temperature: float = 0.7,
-             system_message: Optional[str] = None,
-             image_urls: Optional[List[str]] = None) -> str:
+        self.api_key = api_key or os.getenv("HUGGINGFACE_API_KEY")
+        self.api_base_url = "https://api-inference.huggingface.co/models"
+        self.default_model = "mistralai/Mistral-7B-Instruct-v0.2"
+        
+    async def generate_response(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """
-        Query the HuggingFace Inference API.
+        Generate a response from the HuggingFace API.
         
         Args:
-            prompt: User prompt
-            model: Model to use
-            max_tokens: Maximum tokens in response
-            temperature: Temperature for generation
-            system_message: Optional system message
-            image_urls: Optional list of image URLs (not supported for most models)
+            prompt: The prompt to send to the API
+            **kwargs: Additional parameters for the API
             
         Returns:
-            Generated text response
+            Dict containing the response
         """
-        # Validate and set model
-        model = model or self.default_model
-        if model not in self.available_models:
-            model = self.default_model
-        
-        model_id = self.available_models[model]["model_id"]
-        
-        # Check if API key is available
         if not self.api_key:
-            return "HuggingFace API key not provided. Please add your API key in the settings."
+            return {
+                "text": "HuggingFace API key not configured.",
+                "model": "huggingface",
+                "success": False,
+                "error": "api_key_missing"
+            }
         
-        # Prepare headers
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # Prepare full prompt with system message if provided
-        full_prompt = prompt
-        if system_message:
-            full_prompt = f"{system_message}\n\n{prompt}"
-        
-        # Prepare request data based on model type
-        if "mistral" in model_id.lower():
-            # Mistral format
-            data = {
-                "inputs": f"<s>[INST] {full_prompt} [/INST]",
-                "parameters": {
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                    "return_full_text": False
-                }
-            }
-        elif "llama" in model_id.lower():
-            # Llama format
-            data = {
-                "inputs": f"<s>[INST] {full_prompt} [/INST]",
-                "parameters": {
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                    "return_full_text": False
-                }
-            }
-        elif "falcon" in model_id.lower():
-            # Falcon format
-            data = {
-                "inputs": f"User: {full_prompt}\nAssistant:",
-                "parameters": {
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                    "return_full_text": False
-                }
-            }
-        else:
-            # Generic format
-            data = {
-                "inputs": full_prompt,
-                "parameters": {
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                    "return_full_text": False
-                }
-            }
+        # Get model from kwargs or use default
+        model = kwargs.get("model", self.default_model)
         
         try:
-            # Make API request
-            response = requests.post(
-                f"{self.base_url}/{model_id}",
-                headers=headers,
-                json=data,
-                timeout=60
-            )
+            # Prepare the request payload
+            payload = {
+                "inputs": prompt,
+                "parameters": {
+                    "max_new_tokens": kwargs.get("max_tokens", 1000),
+                    "temperature": kwargs.get("temperature", 0.7),
+                    "top_p": kwargs.get("top_p", 0.9),
+                    "do_sample": True
+                }
+            }
             
-            # Parse response
-            if response.status_code == 200:
-                result = response.json()
-                
-                # Handle different response formats
-                if isinstance(result, list) and len(result) > 0:
-                    if "generated_text" in result[0]:
-                        return result[0]["generated_text"]
-                    else:
-                        return str(result[0])
-                elif isinstance(result, dict):
-                    if "generated_text" in result:
-                        return result["generated_text"]
-                    else:
-                        return str(result)
-                else:
-                    return str(result)
-            else:
-                error_msg = f"HuggingFace API Error: {response.status_code} - {response.text}"
-                print(error_msg)
-                return f"Error: {error_msg}"
-        
-        except Exception as e:
-            error_msg = f"Error querying HuggingFace API: {str(e)}"
-            print(error_msg)
-            return f"Error: {error_msg}"
-    
-    async def query_async(self, 
-                         prompt: str, 
-                         model: Optional[str] = None, 
-                         max_tokens: int = 1000, 
-                         temperature: float = 0.7,
-                         system_message: Optional[str] = None,
-                         image_urls: Optional[List[str]] = None) -> str:
-        """
-        Asynchronous version of query method.
-        
-        Args:
-            prompt: User prompt
-            model: Model to use
-            max_tokens: Maximum tokens in response
-            temperature: Temperature for generation
-            system_message: Optional system message
-            image_urls: Optional list of image URLs (not supported for most models)
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
             
-        Returns:
-            Generated text response
-        """
-        import aiohttp
-        
-        # Validate and set model
-        model = model or self.default_model
-        if model not in self.available_models:
-            model = self.default_model
-        
-        model_id = self.available_models[model]["model_id"]
-        
-        # Check if API key is available
-        if not self.api_key:
-            return "HuggingFace API key not provided. Please add your API key in the settings."
-        
-        # Prepare headers
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # Prepare full prompt with system message if provided
-        full_prompt = prompt
-        if system_message:
-            full_prompt = f"{system_message}\n\n{prompt}"
-        
-        # Prepare request data based on model type
-        if "mistral" in model_id.lower():
-            # Mistral format
-            data = {
-                "inputs": f"<s>[INST] {full_prompt} [/INST]",
-                "parameters": {
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                    "return_full_text": False
-                }
-            }
-        elif "llama" in model_id.lower():
-            # Llama format
-            data = {
-                "inputs": f"<s>[INST] {full_prompt} [/INST]",
-                "parameters": {
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                    "return_full_text": False
-                }
-            }
-        elif "falcon" in model_id.lower():
-            # Falcon format
-            data = {
-                "inputs": f"User: {full_prompt}\nAssistant:",
-                "parameters": {
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                    "return_full_text": False
-                }
-            }
-        else:
-            # Generic format
-            data = {
-                "inputs": full_prompt,
-                "parameters": {
-                    "max_new_tokens": max_tokens,
-                    "temperature": temperature,
-                    "return_full_text": False
-                }
-            }
-        
-        try:
-            # Make API request asynchronously
+            # Make the API request
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.base_url}/{model_id}",
+                    f"{self.api_base_url}/{model}",
                     headers=headers,
-                    json=data,
+                    json=payload,
                     timeout=60
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
                         
-                        # Handle different response formats
+                        # Extract the generated text
                         if isinstance(result, list) and len(result) > 0:
-                            if "generated_text" in result[0]:
-                                return result[0]["generated_text"]
-                            else:
-                                return str(result[0])
-                        elif isinstance(result, dict):
-                            if "generated_text" in result:
-                                return result["generated_text"]
-                            else:
-                                return str(result)
+                            generated_text = result[0].get("generated_text", "")
                         else:
-                            return str(result)
+                            generated_text = str(result)
+                        
+                        return {
+                            "text": generated_text,
+                            "model": f"huggingface/{model.split('/')[-1]}",
+                            "success": True
+                        }
                     else:
-                        response_text = await response.text()
-                        error_msg = f"HuggingFace API Error: {response.status} - {response_text}"
-                        print(error_msg)
-                        return f"Error: {error_msg}"
-        
+                        error_text = await response.text()
+                        return {
+                            "text": f"Error from HuggingFace API: {error_text}",
+                            "model": "huggingface",
+                            "success": False,
+                            "error": "api_error",
+                            "status_code": response.status
+                        }
+        except asyncio.TimeoutError:
+            return {
+                "text": "Request to HuggingFace API timed out.",
+                "model": "huggingface",
+                "success": False,
+                "error": "timeout"
+            }
         except Exception as e:
-            error_msg = f"Error querying HuggingFace API: {str(e)}"
-            print(error_msg)
-            return f"Error: {error_msg}"
+            return {
+                "text": f"Error calling HuggingFace API: {str(e)}",
+                "model": "huggingface",
+                "success": False,
+                "error": "request_error"
+            }
     
-    def get_token_count(self, text: str) -> int:
+    async def get_embedding(self, text: str, model: str = "sentence-transformers/all-MiniLM-L6-v2") -> Dict[str, Any]:
         """
-        Estimate the number of tokens in a text.
+        Get an embedding from the HuggingFace API.
         
         Args:
-            text: Input text
+            text: The text to embed
+            model: The model to use for embedding
             
         Returns:
-            Estimated token count
-        """
-        # Simple estimation (approximately 4 chars per token)
-        return len(text) // 4
-    
-    def get_available_models(self) -> List[str]:
-        """
-        Get list of available models.
-        
-        Returns:
-            List of model names
-        """
-        return list(self.available_models.keys())
-    
-    def get_model_info(self, model: str) -> Dict[str, Any]:
-        """
-        Get information about a specific model.
-        
-        Args:
-            model: Model name
-            
-        Returns:
-            Model information
-        """
-        return self.available_models.get(model, {})
-    
-    def check_api_key(self) -> bool:
-        """
-        Check if the API key is valid.
-        
-        Returns:
-            True if valid, False otherwise
+            Dict containing the embedding
         """
         if not self.api_key:
-            return False
+            return {
+                "embedding": None,
+                "model": "huggingface",
+                "success": False,
+                "error": "api_key_missing"
+            }
         
         try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}"
+            # Prepare the request payload
+            payload = {
+                "inputs": text
             }
             
-            response = requests.get(
-                "https://huggingface.co/api/whoami",
-                headers=headers,
-                timeout=10
-            )
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
             
-            return response.status_code == 200
-        
-        except Exception:
-            return False
+            # Make the API request
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.api_base_url}/{model}",
+                    headers=headers,
+                    json=payload,
+                    timeout=30
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        
+                        return {
+                            "embedding": result,
+                            "model": f"huggingface/{model.split('/')[-1]}",
+                            "success": True
+                        }
+                    else:
+                        error_text = await response.text()
+                        return {
+                            "embedding": None,
+                            "model": "huggingface",
+                            "success": False,
+                            "error": "api_error",
+                            "status_code": response.status,
+                            "error_text": error_text
+                        }
+        except Exception as e:
+            return {
+                "embedding": None,
+                "model": "huggingface",
+                "success": False,
+                "error": "request_error",
+                "error_text": str(e)
+            }

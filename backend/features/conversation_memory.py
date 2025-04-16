@@ -1,215 +1,292 @@
 import os
-import json
+import asyncio
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+import aiohttp
+import json
 
 class ConversationMemory:
     """
-    Manages conversation history and context for AI interactions.
+    Manages conversation history and context for the Multi-AI application.
+    Provides methods for storing, retrieving, and managing conversation data.
     """
     
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, max_history_length: int = 20, max_context_tokens: int = 4000):
         """
-        Initialize the conversation memory.
+        Initialize the conversation memory manager.
         
         Args:
-            storage_path: Optional path to store conversation history
+            max_history_length: Maximum number of messages to store per conversation
+            max_context_tokens: Maximum number of tokens to include in context
         """
-        self.storage_path = storage_path
-        self.conversation_history = []
-        self.max_history_length = 100  # Default max history length
+        self.conversations = {}
+        self.max_history_length = max_history_length
+        self.max_context_tokens = max_context_tokens
+        self.storage_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "conversations")
         
-        # Load existing conversation if storage path is provided
-        if storage_path and os.path.exists(storage_path):
-            self._load_conversation()
+        # Create storage directory if it doesn't exist
+        os.makedirs(self.storage_dir, exist_ok=True)
     
-    def add_message(self, role: str, content: str) -> Dict[str, Any]:
+    def add_message(self, conversation_id: str, role: str, content: str, model: Optional[str] = None) -> None:
         """
         Add a message to the conversation history.
         
         Args:
-            role: Message role (user, assistant, system)
-            content: Message content
-            
-        Returns:
-            Added message
+            conversation_id: Unique identifier for the conversation
+            role: Role of the message sender (user or assistant)
+            content: Content of the message
+            model: Model that generated the message (for assistant messages)
         """
-        message = {
+        # Initialize conversation if it doesn't exist
+        if conversation_id not in self.conversations:
+            self.conversations[conversation_id] = []
+        
+        # Add the message
+        self.conversations[conversation_id].append({
             "role": role,
             "content": content,
-            "timestamp": datetime.now().isoformat()
-        }
+            "model": model,
+            "timestamp": asyncio.get_event_loop().time()
+        })
         
-        self.conversation_history.append(message)
-        
-        # Trim history if it exceeds max length
-        if len(self.conversation_history) > self.max_history_length:
-            self.conversation_history = self.conversation_history[-self.max_history_length:]
-        
-        # Save conversation if storage path is provided
-        if self.storage_path:
-            self._save_conversation()
-        
-        return message
+        # Trim history if it exceeds the maximum length
+        if len(self.conversations[conversation_id]) > self.max_history_length:
+            self.conversations[conversation_id] = self.conversations[conversation_id][-self.max_history_length:]
     
-    def get_conversation_history(self) -> List[Dict[str, Any]]:
+    def get_conversation_history(self, conversation_id: str) -> List[Dict[str, Any]]:
         """
         Get the full conversation history.
         
+        Args:
+            conversation_id: Unique identifier for the conversation
+            
         Returns:
-            List of messages
+            List of message dictionaries
         """
-        return self.conversation_history
+        return self.conversations.get(conversation_id, [])
     
-    def clear_conversation(self) -> None:
+    def get_context_for_prompt(self, conversation_id: str, max_messages: Optional[int] = None) -> str:
         """
-        Clear the conversation history.
-        """
-        self.conversation_history = []
-        
-        # Save empty conversation if storage path is provided
-        if self.storage_path:
-            self._save_conversation()
-    
-    def get_context_window(self, max_tokens: int = 4000) -> List[Dict[str, str]]:
-        """
-        Get a context window of messages that fits within token limit.
+        Get formatted conversation context for inclusion in a prompt.
         
         Args:
-            max_tokens: Maximum tokens in context window
+            conversation_id: Unique identifier for the conversation
+            max_messages: Maximum number of messages to include (defaults to all)
             
         Returns:
-            List of messages for context window
+            Formatted conversation context string
         """
-        # Simple token estimation (4 chars ≈ 1 token)
-        def estimate_tokens(text: str) -> int:
-            return len(text) // 4
+        history = self.conversations.get(conversation_id, [])
         
-        # Start with most recent messages
-        context = []
-        token_count = 0
+        if not history:
+            return ""
         
-        # Add messages from newest to oldest until token limit is reached
-        for message in reversed(self.conversation_history):
-            message_tokens = estimate_tokens(message["content"])
+        # Limit the number of messages if specified
+        if max_messages is not None:
+            history = history[-max_messages:]
+        
+        # Format the conversation context
+        context = "Previous conversation:\n\n"
+        
+        for message in history:
+            role = "User" if message["role"] == "user" else "Assistant"
+            model_info = f" ({message['model']})" if message.get("model") else ""
             
-            if token_count + message_tokens <= max_tokens:
-                # Add message to context (at the beginning to maintain order)
-                context.insert(0, {
-                    "role": message["role"],
-                    "content": message["content"]
-                })
-                token_count += message_tokens
-            else:
-                # Token limit reached
-                break
+            context += f"{role}{model_info}: {message['content']}\n\n"
         
         return context
     
-    def summarize_conversation(self, max_length: int = 200) -> str:
+    def clear_conversation(self, conversation_id: str) -> None:
         """
-        Generate a summary of the conversation.
+        Clear the conversation history.
         
         Args:
-            max_length: Maximum length of summary in characters
+            conversation_id: Unique identifier for the conversation
+        """
+        if conversation_id in self.conversations:
+            self.conversations[conversation_id] = []
+    
+    def save_conversation(self, conversation_id: str) -> Optional[str]:
+        """
+        Save the conversation to a file.
+        
+        Args:
+            conversation_id: Unique identifier for the conversation
             
         Returns:
-            Conversation summary
+            Path to the saved file, or None if saving failed
         """
-        if not self.conversation_history:
-            return "No conversation history."
+        if conversation_id not in self.conversations or not self.conversations[conversation_id]:
+            return None
         
-        # Count messages by role
-        user_messages = sum(1 for m in self.conversation_history if m["role"] == "user")
-        assistant_messages = sum(1 for m in self.conversation_history if m["role"] == "assistant")
-        
-        # Get first and last messages
-        first_message = self.conversation_history[0]
-        last_message = self.conversation_history[-1]
-        
-        # Create summary
-        summary = f"Conversation with {user_messages} user messages and {assistant_messages} assistant responses. "
-        
-        # Add first user message
-        first_user_message = next((m for m in self.conversation_history if m["role"] == "user"), None)
-        if first_user_message:
-            first_content = first_user_message["content"]
-            if len(first_content) > 50:
-                first_content = first_content[:47] + "..."
-            summary += f"Started with: \"{first_content}\" "
-        
-        # Add last exchange
-        last_user_message = next((m for m in reversed(self.conversation_history) if m["role"] == "user"), None)
-        if last_user_message:
-            last_content = last_user_message["content"]
-            if len(last_content) > 50:
-                last_content = last_content[:47] + "..."
-            summary += f"Latest user query: \"{last_content}\""
-        
-        # Truncate if necessary
-        if len(summary) > max_length:
-            summary = summary[:max_length-3] + "..."
-        
-        return summary
-    
-    def _save_conversation(self) -> None:
-        """
-        Save conversation history to storage.
-        """
         try:
-            with open(self.storage_path, 'w') as f:
-                json.dump({
-                    "history": self.conversation_history,
-                    "last_updated": datetime.now().isoformat()
-                }, f, indent=2)
+            # Create a filename with the conversation ID
+            filename = f"conversation_{conversation_id}.json"
+            filepath = os.path.join(self.storage_dir, filename)
+            
+            # Prepare the data
+            data = {
+                "conversation_id": conversation_id,
+                "timestamp": asyncio.get_event_loop().time(),
+                "messages": self.conversations[conversation_id]
+            }
+            
+            # Write to file
+            with open(filepath, "w") as f:
+                json.dump(data, f, indent=2)
+            
+            return filepath
         except Exception as e:
-            print(f"Error saving conversation: {str(e)}")
+            print(f"Error saving conversation: {e}")
+            return None
     
-    def _load_conversation(self) -> None:
+    def load_conversation(self, conversation_id: str) -> bool:
         """
-        Load conversation history from storage.
+        Load a conversation from a file.
+        
+        Args:
+            conversation_id: Unique identifier for the conversation
+            
+        Returns:
+            True if loading was successful, False otherwise
         """
         try:
-            with open(self.storage_path, 'r') as f:
+            # Create a filename with the conversation ID
+            filename = f"conversation_{conversation_id}.json"
+            filepath = os.path.join(self.storage_dir, filename)
+            
+            # Check if the file exists
+            if not os.path.exists(filepath):
+                return False
+            
+            # Read from file
+            with open(filepath, "r") as f:
                 data = json.load(f)
-                self.conversation_history = data.get("history", [])
+            
+            # Load the conversation
+            self.conversations[conversation_id] = data.get("messages", [])
+            
+            return True
         except Exception as e:
-            print(f"Error loading conversation: {str(e)}")
-            self.conversation_history = []
+            print(f"Error loading conversation: {e}")
+            return False
     
-    def get_last_n_messages(self, n: int = 10) -> List[Dict[str, Any]]:
+    def get_all_conversations(self) -> List[Dict[str, Any]]:
         """
-        Get the last N messages from conversation history.
+        Get a list of all saved conversations.
+        
+        Returns:
+            List of conversation metadata dictionaries
+        """
+        conversations = []
+        
+        try:
+            # List all conversation files
+            for filename in os.listdir(self.storage_dir):
+                if filename.startswith("conversation_") and filename.endswith(".json"):
+                    filepath = os.path.join(self.storage_dir, filename)
+                    
+                    try:
+                        # Read the file
+                        with open(filepath, "r") as f:
+                            data = json.load(f)
+                        
+                        # Extract metadata
+                        conversation_id = data.get("conversation_id")
+                        timestamp = data.get("timestamp")
+                        message_count = len(data.get("messages", []))
+                        
+                        # Add to list
+                        conversations.append({
+                            "conversation_id": conversation_id,
+                            "timestamp": timestamp,
+                            "message_count": message_count,
+                            "filepath": filepath
+                        })
+                    except Exception as e:
+                        print(f"Error reading conversation file {filename}: {e}")
+        except Exception as e:
+            print(f"Error listing conversations: {e}")
+        
+        # Sort by timestamp (newest first)
+        conversations.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+        
+        return conversations
+    
+    def delete_conversation(self, conversation_id: str) -> bool:
+        """
+        Delete a conversation.
         
         Args:
-            n: Number of messages to retrieve
+            conversation_id: Unique identifier for the conversation
             
         Returns:
-            List of last N messages
+            True if deletion was successful, False otherwise
         """
-        return self.conversation_history[-n:] if self.conversation_history else []
+        try:
+            # Remove from memory
+            if conversation_id in self.conversations:
+                del self.conversations[conversation_id]
+            
+            # Remove from disk
+            filename = f"conversation_{conversation_id}.json"
+            filepath = os.path.join(self.storage_dir, filename)
+            
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            
+            return True
+        except Exception as e:
+            print(f"Error deleting conversation: {e}")
+            return False
     
-    def get_messages_by_role(self, role: str) -> List[Dict[str, Any]]:
+    def search_conversations(self, query: str) -> List[Dict[str, Any]]:
         """
-        Get all messages with a specific role.
+        Search for conversations containing the query.
         
         Args:
-            role: Role to filter by (user, assistant, system)
+            query: Search query
             
         Returns:
-            List of messages with specified role
+            List of matching conversation metadata dictionaries
         """
-        return [m for m in self.conversation_history if m["role"] == role]
-    
-    def set_max_history_length(self, length: int) -> None:
-        """
-        Set maximum history length.
+        matching_conversations = []
         
-        Args:
-            length: Maximum number of messages to keep
-        """
-        self.max_history_length = max(10, length)  # Minimum of 10 messages
+        try:
+            # List all conversation files
+            for filename in os.listdir(self.storage_dir):
+                if filename.startswith("conversation_") and filename.endswith(".json"):
+                    filepath = os.path.join(self.storage_dir, filename)
+                    
+                    try:
+                        # Read the file
+                        with open(filepath, "r") as f:
+                            data = json.load(f)
+                        
+                        # Check if any message contains the query
+                        messages = data.get("messages", [])
+                        for message in messages:
+                            if query.lower() in message.get("content", "").lower():
+                                # Extract metadata
+                                conversation_id = data.get("conversation_id")
+                                timestamp = data.get("timestamp")
+                                message_count = len(messages)
+                                
+                                # Add to list
+                                matching_conversations.append({
+                                    "conversation_id": conversation_id,
+                                    "timestamp": timestamp,
+                                    "message_count": message_count,
+                                    "filepath": filepath
+                                })
+                                
+                                # Break to avoid adding the same conversation multiple times
+                                break
+                    except Exception as e:
+                        print(f"Error reading conversation file {filename}: {e}")
+        except Exception as e:
+            print(f"Error searching conversations: {e}")
         
-        # Trim history if it exceeds new max length
-        if len(self.conversation_history) > self.max_history_length:
-            self.conversation_history = self.conversation_history[-self.max_history_length:]
+        # Sort by timestamp (newest first)
+        matching_conversations.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+        
+        return matching_conversations

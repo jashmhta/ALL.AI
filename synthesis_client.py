@@ -56,7 +56,11 @@ class SynthesisClient:
         
         try:
             # Use Llama to synthesize the responses
+<<<<<<< HEAD
             synthesis_response = await self.llama_client.generate_response(
+=======
+            synthesis_response = await self.llama_client.get_response(
+>>>>>>> main
                 synthesis_prompt,
                 temperature=temperature,
                 max_tokens=kwargs.get("max_tokens", 1500)

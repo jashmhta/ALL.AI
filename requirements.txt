@@ -7,5 +7,3 @@ aiohttp==3.11.16
 toml==0.10.2
 matplotlib==3.8.4
 PyPDF2==3.0.1
-python-dotenv==1.0.0
-huggingface_hub==0.30.2
